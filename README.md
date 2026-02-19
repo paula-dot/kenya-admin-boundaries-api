@@ -1,4 +1,4 @@
-#  Kenya County, Constituency & Ward API
+#  Kenya Admin Boundaries API
 
 A production-grade geospatial API and visualization platform specifically mapping Kenya's administrative and electoral boundaries down to the ward level.
 
@@ -76,5 +76,5 @@ All spatial responses are returned as standard `GeoJSON FeatureCollection` objec
 ##  Architecture & Best Practices
 
 * **Clean Architecture:** The backend strictly isolates the domain logic from external frameworks, HTTP delivery, and database implementations.
-* **Spatial Indexing:** All boundary geometries utilize PostGIS `GIST` indexes for highly optimized spatial intersections.
+* **Spatial Indexing:** All boundary geometries use PostGIS `GIST` indexes for highly optimized spatial intersections.
 * **Caching Strategy:** Expensive `ST_AsGeoJSON` database queries are cached in Redis to guarantee sub-millisecond response times for frequently requested boundaries.
