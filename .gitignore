@@ -1,0 +1,94 @@
+# --- OS generated files ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Editor/IDE ---
+.vscode/
+.idea/
+*.iml
+
+# Ignore common Go build outputs and test binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+coverage.out
+
+# If you produce binaries at repo root or backend/bin
+/bin/
+/backend/bin/
+cmd/**/bin/
+
+# Build directories
+/dist/
+/build/
+
+# --- Node / Frontend ---
+node_modules/
+frontend/node_modules/
+frontend/build/
+frontend/dist/
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# --- Python ---
+venv/
+.venv/
+env/
+ENV/
+venv.bak/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+.python-version
+
+# --- Data / Large binary files ---
+data-pipeline/raw_data/
+*.gpkg
+*.gpkg.zip
+*.shp
+*.dbf
+*.shx
+*.prj
+*.zip
+*.tar.gz
+
+# --- Redis / DB / runtime dumps ---
+dump.rdb
+redis/dump.rdb
+*.sqlite
+*.db
+
+# --- Docker ---
+.env
+.env.*
+docker-compose.override.yml
+
+# --- Logs and coverage ---
+logs/
+*.log
+coverage/
+coverage.out
+.nyc_output/
+
+# --- Credentials / Secrets ---
+*.pem
+*.key
+*.crt
+*.p12
+secrets.env
+credentials.yaml
+aws_credentials
+
+# --- Misc / Editor temporary files ---
+*~
+*.swp
+*.swo
