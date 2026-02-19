@@ -2,12 +2,16 @@ package domain
 
 import (
 	"time"
+
+	"github.com/google/uuid"
 )
 
-type GeoJSON string
-
-type Base struct {
-	ID        int       `json:"id"`
-	CreatedAt time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
+// County represents the core administrative boundary entity.
+type County struct {
+	ID        uuid.UUID
+	Code      string
+	Name      string
+	Geometry  []byte // This will hold the raw JSON bytes returned from the DB
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
