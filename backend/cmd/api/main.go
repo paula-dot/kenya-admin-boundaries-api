@@ -9,8 +9,10 @@ import (
 	"syscall"
 	"time"
 
-	// TODO: Replace "your_module_name" with the actual name in your go.mod file
-	"your_module_name/internal/config"
+	"github.com/paula-dot/kenya-admin-boundaries-api/internal/config"
+	"github.com/paula-dot/kenya-admin-boundaries-api/internal/handler"
+	"github.com/paula-dot/kenya-admin-boundaries-api/internal/repository/postgres"
+	"github.com/paula-dot/kenya-admin-boundaries-api/internal/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
