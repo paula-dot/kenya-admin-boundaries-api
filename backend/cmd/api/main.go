@@ -9,6 +9,9 @@ import (
 	"syscall"
 	"time"
 
+	// TODO: Replace "your_module_name" with the actual name in your go.mod file
+	"your_module_name/internal/config"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
 )
@@ -18,15 +21,16 @@ func main() {
 	ctx := context.Background()
 
 	// 2. Load Configuration
-	// TODO: Replace with your internal/config loader once built
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		// Fallback for local development
-		dbURL = "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"
+	cfg, err := config.LoadConfig(".")
+	if err != nil {
+		log.Fatalf("Unable to load configuration: %v\n", err)
 	}
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
+
+	if cfg.Port == "" {
+		cfg.Port = "8080"
+	}
+	if cfg.DBUrl == "" {
+		cfg.DBUrl = "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"
 	}
 
 	// 3. Database Connection Pooling (pgxpool)
@@ -43,6 +47,7 @@ func main() {
 	log.Println("Successfully connected to database!")
 
 	// 4. Dependency Injection Setup
+	// When we build these layers, we will pass 'cfg' or 'dbPool' directly into them.
 	// TODO: Instantiate Redis cache
 	// TODO: repo := postgres.NewCountyRepository(dbPool)
 	// TODO: svc := service.NewCountyService(repo)
@@ -51,7 +56,10 @@ func main() {
 	// Temporary Gin Router setup for testing
 	router := gin.Default()
 	router.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "API is up and running!"})
+		c.JSON(http.StatusOK, gin.H{
+			"status": "API is up and running!",
+			"env":    cfg.Environment,
+		})
 	})
 
 	// 5. Server Initialization
@@ -63,7 +71,7 @@ func main() {
 	// 6. Graceful Shutdown Implementation
 	// Run the server in a goroutine so it doesn't block the shutdown handling
 	go func() {
-		log.Printf("Starting API server on port %s...\n", port)
+		log.Printf("Starting API server on port %s...\n", cfg.Environment, cfg.Port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Failed to listen and serve: %v\n", err)
 		}
@@ -71,9 +79,6 @@ func main() {
 
 	// Wait for an interrupt signal to gracefully shut down the server
 	quit := make(chan os.Signal, 1)
-	// kill (no param) default send syscall.SIGTERM
-	// kill -2 is syscall.SIGINT
-	// kill -9 is syscall.SIGKILL but can't be caught, so don't need to add it
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 	log.Println("Shutdown signal received. Shutting down server...")
