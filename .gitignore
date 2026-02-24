@@ -71,6 +71,8 @@ redis/dump.rdb
 .env
 .env.*
 docker-compose.override.yml
+secret/
+postgres_password
 
 # --- Logs and coverage ---
 logs/

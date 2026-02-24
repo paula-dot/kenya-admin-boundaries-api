@@ -1,26 +1,47 @@
-version: '3.8'
-
 services:
   db:
     image: postgis/postgis:15-3.3
     container_name: spatial_pg
+    # In production, provide secrets via Docker secrets (or a secrets manager).
+    # This service reads POSTGRES_PASSWORD from the file mounted at /run/secrets/postgres_password
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: spatial_db
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_DB: ${POSTGRES_DB:-spatial_db}
+    ports: [] # avoid publishing ports by default in production
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - pg_data:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
       timeout: 5s
       retries: 5
+    secrets:
+      - postgres_password
+
+  pgadmin:
+    image: dpage/pgadmin4:7
+    container_name: pgadmin
+    # In production you should supply credentials through the platform's secret mechanism.
+    environment:
+      PGADMIN_SETUP_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-}
+      PGADMIN_SETUP_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-}
+    ports: [] # don't publish by default in production
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    restart: unless-stopped
+    depends_on:
+      - db
 
 volumes:
   pg_data:
     driver: local
+  pgadmin_data:
+    driver: local
   redis_data:
     driver: local
+
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password
+
