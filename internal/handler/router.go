@@ -1,11 +1,15 @@
 package handler
 
 import (
-	"github/gin-gonic/gin"
+	"github.com/gin-gonic/gin"
+	"github.com/paula-dot/kenya-admin-boundaries-api/internal/service"
 )
 
 // SetupRouter configures the Gin engine and registers all API routes.
-func SetupRouter(CountyHandler *CountyHandler) *gin.Engine {
+func SetupRouter(svc *service.CountyService) *gin.Engine {
+	// Create handlers with service dependencies
+	countyHandler := NewCountyHandler(svc)
+
 	// Use gin.New() instead of Default() if you want to explicitly define your middlewares later
 	router := gin.New()
 
@@ -23,8 +27,8 @@ func SetupRouter(CountyHandler *CountyHandler) *gin.Engine {
 		// County routes
 		counties := v1.Group("/counties")
 		{
-			counties.GET("", countyHandler, ListCounties)
-			counties.GET("/:id", countyHandler.GetCounty)
+			counties.GET("", countyHandler.ListCounties)
+			counties.GET(":id", countyHandler.GetCounty)
 		}
 	}
 

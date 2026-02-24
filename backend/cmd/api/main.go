@@ -12,10 +12,11 @@ import (
 	"github.com/paula-dot/kenya-admin-boundaries-api/internal/config"
 	"github.com/paula-dot/kenya-admin-boundaries-api/internal/handler"
 	"github.com/paula-dot/kenya-admin-boundaries-api/internal/repository/postgres"
+	redisRepo "github.com/paula-dot/kenya-admin-boundaries-api/internal/repository/redis"
 	"github.com/paula-dot/kenya-admin-boundaries-api/internal/service"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
@@ -36,8 +37,7 @@ func main() {
 	}
 
 	// 3. Database Connection Pooling (pgxpool)
-	// pgxpool manages a pool of connections securely and efficiently.
-	dbPool, err := pgxpool.New(ctx, dbURL)
+	dbPool, err := pgxpool.New(ctx, cfg.DBUrl)
 	if err != nil {
 		log.Fatalf("Unable to create database connection pool: %v\n", err)
 	}
@@ -49,14 +49,19 @@ func main() {
 	log.Println("Successfully connected to database!")
 
 	// 4. Dependency Injection Setup
-	// When we build these layers, we will pass 'cfg' or 'dbPool' directly into them.
-	// TODO: Instantiate Redis cache
-	// TODO: repo := postgres.NewCountyRepository(dbPool)
-	// TODO: svc := service.NewCountyService(repo)
-	// TODO: router := handler.SetupRouter(svc)
+	pgRepo := postgres.NewCountyRepository(dbPool)
 
-	// Temporary Gin Router setup for testing
-	router := gin.Default()
+	cacheRepo, err := redisRepo.NewCacheRepository(cfg.RedisURL)
+	if err != nil {
+		log.Fatalf("Unable to initialize redis cache: %v\n", err)
+	}
+
+	svc := service.NewCountyService(pgRepo, cacheRepo)
+
+	// wire svc into handlers/router
+	router := handler.SetupRouter(svc)
+
+	// Health endpoint (ensure SetupRouter sets other routes; this is a safe fallback)
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status": "API is up and running!",
@@ -66,14 +71,13 @@ func main() {
 
 	// 5. Server Initialization
 	srv := &http.Server{
-		Addr:    ":" + port,
+		Addr:    ":" + cfg.Port,
 		Handler: router,
 	}
 
 	// 6. Graceful Shutdown Implementation
-	// Run the server in a goroutine so it doesn't block the shutdown handling
 	go func() {
-		log.Printf("Starting API server on port %s...\n", cfg.Environment, cfg.Port)
+		log.Printf("Starting API server on port %s...\n", cfg.Port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Failed to listen and serve: %v\n", err)
 		}

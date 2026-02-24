@@ -1,12 +1,6 @@
 package domain
 
-import "time"
-
-type County struct {
-	ID        int       `json:"id"`
-	Name      string    `json:"name"`
-	Slug      string    `json:"slug"`
-	Code      string    `json:"code,omitempty"`
-	GeoJSON   string    `json:"geojson,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
-}
+// NOTE: county.go previously contained a County type definition that conflicted
+// with `internal/domain/models.go`. The canonical domain models live in
+// models.go (UUID-based County). This file is intentionally left minimal to
+// avoid duplicate type declarations.

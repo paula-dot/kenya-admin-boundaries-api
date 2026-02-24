@@ -6,7 +6,7 @@ import "encoding/json"
 // Leaflet.js will consume this directly to plot multiple layers on your map.
 type FeatureCollection struct {
 	Type     string    `json:"type"`
-	Features []feature `json:"features"`
+	Features []Feature `json:"features"`
 }
 
 // Feature represents a standard GeoJSON Feature.
