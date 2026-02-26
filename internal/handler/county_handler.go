@@ -2,10 +2,10 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
-	
+
 	"github.com/paula-dot/kenya-admin-boundaries-api/internal/service"
 )
 
@@ -23,23 +23,20 @@ func NewCountyHandler(countyService *service.CountyService) *CountyHandler {
 
 // GetCounty retrieves a single county as a GeoJSON Feature.
 func (h *CountyHandler) GetCounty(c *gin.Context) {
-	// 1. Input Validation: Ensure the ID is a valid UUID to prevent SQL injection or bad queries
 	idParam := c.Param("id")
-	countyID, err := uuid.Parse(idParam)
+	id64, err := strconv.ParseInt(idParam, 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid county ID format. Must be a UUID."})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid county ID format. Must be an integer."})
 		return
 	}
+	id := int32(id64)
 
-	// 2. Call the Service Layer
-	feature, err := h.countyService.GetCountyAsFeature(c.Request.Context(), countyID)
+	feature, err := h.countyService.GetCountyAsFeature(c.Request.Context(), id)
 	if err != nil {
-		// In a production app, you'd check if the error is a "not found" vs "internal server error"
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve county"})
 		return
 	}
 
-	// 3. Return the payload. Gin will perfectly serialize the json.RawMessage inside the Feature.
 	c.JSON(http.StatusOK, feature)
 }
 
@@ -47,7 +44,7 @@ func (h *CountyHandler) GetCounty(c *gin.Context) {
 func (h *CountyHandler) ListCounties(c *gin.Context) {
 	collection, err := h.countyService.ListCountiesAsFeatureCollection(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ginH{"error": "Failed to retrieve counties"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve counties"})
 		return
 	}
 

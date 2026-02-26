@@ -2,13 +2,11 @@ package domain
 
 import (
 	"time"
-
-	"github.com/google/uuid"
 )
 
 // County represents the core administrative boundary entity.
 type County struct {
-	ID        uuid.UUID
+	ID        int32
 	Code      string
 	Name      string
 	Geometry  []byte // This will hold the raw JSON bytes returned from the DB

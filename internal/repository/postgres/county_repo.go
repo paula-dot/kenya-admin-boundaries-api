@@ -3,8 +3,8 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/paula-dot/kenya-admin-boundaries-api/internal/domain"
@@ -26,21 +26,30 @@ func NewCountyRepository(pool *pgxpool.Pool) *CountyRepo {
 }
 
 // GetCountyByID executes the SQL query and maps the result to the domain model.
-func (r *CountyRepo) GetCountyByID(ctx context.Context, id uuid.UUID) (*domain.County, error) {
+func (r *CountyRepo) GetCountyByID(ctx context.Context, id int32) (*domain.County, error) {
 	// Call the sqlc-generated GetCountyByID method
 	row, err := r.db.GetCountyByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("repository - GetCountyByID failed: %w", err)
 	}
 
+	// Convert pgtype.Text to string
+	code := ""
+	if row.Code.String != "" {
+		code = row.Code.String
+	}
+
+	// Convert created_at
+	created := time.Time{}
+	created = row.CreatedAt.Time
+
 	// Map the database-specific struct to your pure domain model
 	county := &domain.County{
 		ID:        row.ID,
-		Code:      row.Code,
+		Code:      code,
 		Name:      row.Name,
-		Geometry:  row.GeoJSON, // This is the []byte cast from our ST_AsGeoJSON query
-		CreatedAt: row.CreatedAt,
-		UpdatedAt: row.UpdatedAt,
+		Geometry:  row.Geojson,
+		CreatedAt: created,
 	}
 
 	return county, nil
@@ -48,20 +57,25 @@ func (r *CountyRepo) GetCountyByID(ctx context.Context, id uuid.UUID) (*domain.C
 
 // ListCounties executes the list query and maps the slice of results to domain models.
 func (r *CountyRepo) ListCounties(ctx context.Context) ([]*domain.County, error) {
-	row, err := r.db.ListCounties(ctx)
+	rows, err := r.db.ListCounties(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("repository - ListCounties failed: %w", err)
 	}
 
 	var counties []*domain.County
 	for _, row := range rows {
-		counties := &domain.County{
-			ID:       row.ID,
-			Code:     row.Code,
-			Name:     row.Name,
-			Geometry: row.GeoJSON,
+		code := ""
+		if row.Code.String != "" {
+			code = row.Code.String
 		}
-		counties = append(counties, county)
+
+		c := &domain.County{
+			ID:       row.ID,
+			Code:     code,
+			Name:     row.Name,
+			Geometry: row.Geojson,
+		}
+		counties = append(counties, c)
 	}
 
 	return counties, nil
