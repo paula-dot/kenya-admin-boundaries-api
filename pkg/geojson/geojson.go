@@ -31,3 +31,34 @@ func NewFeatureCollection(features []Feature) *FeatureCollection {
 		Features: features,
 	}
 }
+
+// --- Domain metadata structs for Feature.Properties ---
+// CountyProperties holds the metadata for a county.
+type CountyProperties struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+	Code string `json:"code,omitempty"` // E.g., "047" for Nairobi
+}
+
+// ConstituencyProperties holds metadata for a constituency.
+type ConstituencyProperties struct {
+	ID       int    `json:"id"`
+	CountyID int    `json:"county_id"`
+	Name     string `json:"name"`
+	Slug     string `json:"slug"`
+}
+
+// WardProperties holds metadata for a ward.
+type WardProperties struct {
+	ID             int    `json:"id"`
+	ConstituencyID int    `json:"constituency_id"`
+	Name           string `json:"name"`
+	Slug           string `json:"slug"`
+}
+
+// PointRequest represents the JSON body expected for spatial intersection queries.
+type PointRequest struct {
+	Longitude float64 `json:"lng" binding:"required,min=-180,max=180"`
+	Latitude  float64 `json:"lat" binding:"required,min=-90,max=90"`
+}
