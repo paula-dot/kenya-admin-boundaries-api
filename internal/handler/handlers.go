@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/paula-dot/kenya-admin-boundaries-api/internal/dto/request"
+	"github.com/paula-dot/kenya-admin-boundaries-api/internal/dto"
 	"github.com/paula-dot/kenya-admin-boundaries-api/internal/repository"
 )
 
@@ -45,7 +45,7 @@ func getWardsByConstituency(c *gin.Context) {
 }
 
 func (h *APIHandler) CheckIntersection(c *gin.Context) {
-	var req request.PointRequest
+	var req dto.PointRequest
 
 	// BindJSON validates the incoming payload against our struct tags (min/max limits)
 	if err := c.ShouldBindJSON(&req); err != nil {

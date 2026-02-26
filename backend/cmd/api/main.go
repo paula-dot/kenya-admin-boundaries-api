@@ -17,6 +17,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/paula-dot/kenya-admin-boundaries-api/internal/repository"
+	"github.com/paula-dot/kenya-admin-boundaries-api/pkg/db"
 )
 
 func main() {
@@ -68,6 +71,21 @@ func main() {
 			"env":    cfg.Environment,
 		})
 	})
+
+	// Additional spatial repository and handler wiring (user requested append)
+	// Inside main()
+	// NOTE: these lines assume packages `pkg/db`, `internal/repository` and `internal/handler`
+	// expose the referenced symbols. Adjust imports/paths if your project differs.
+	dbPool2 := db.Connect("postgresql://postgres:password@localhost:5433/spatial_db")
+	repo := &repository.SpatialRepository{DB: dbPool2}
+	apiHandler := &handler.APIHandler{Repo: repo}
+
+	// If SetupRouter created route groups `v1` and `spatial` these show how to wire them.
+	// Otherwise you may need to adapt to your router structure.
+	v1 := router.Group("/v1")
+	spatial := v1.Group("/spatial")
+	v1.GET("/counties/:slug", apiHandler.GetCountyBySlug)
+	spatial.POST("/intersect", apiHandler.CheckIntersection)
 
 	// 5. Server Initialization
 	srv := &http.Server{

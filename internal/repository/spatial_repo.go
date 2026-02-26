@@ -8,6 +8,13 @@ import (
 	"github.com/paula-dot/kenya-admin-boundaries-api/pkg/geojson"
 )
 
+// SpatialRepo defines the subset of repository methods used by HTTP handlers.
+// Having this interface allows handlers to depend on an abstraction for easier testing.
+type SpatialRepo interface {
+	GetCountyBySlug(ctx context.Context, slug string) (*geojson.Feature, error)
+	GetLocationByPoint(ctx context.Context, lng, lat float64) (*IntersectionResult, error)
+}
+
 type SpatialRepository struct {
 	DB *pgxpool.Pool
 }
@@ -51,11 +58,11 @@ func (r *SpatialRepository) GetCountyBySlug(ctx context.Context, slug string) (*
 }
 
 // GetLocationByPoint checks which boundaries intersect with a given Lat/Lng
-func (r *SpatialRepository) GetLocaationByPoint(ctx context.Context, lng, lat float64) (*IntersectionResult, error) {
+func (r *SpatialRepository) GetLocationByPoint(ctx context.Context, lng, lat float64) (*IntersectionResult, error) {
 	// ST_MakePoint takes (Longitude, Latitude). ST_SetSRID sets it to WGS84 standard (4326).
 	query := `
 		SELECT 
-			  	w.name AS ward,
+				w.name AS ward,
 				c.name AS constituency,
 				co.name AS county
 		FROM wards w
