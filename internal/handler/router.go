@@ -10,6 +10,7 @@ import (
 
 	"github.com/paula-dot/kenya-admin-boundaries-api/internal/domain"
 	"github.com/paula-dot/kenya-admin-boundaries-api/internal/service"
+	"github.com/paula-dot/kenya-admin-boundaries-api/pkg/geojson"
 )
 
 // SetupRouter wires service into HTTP routes and returns a *gin.Engine.
@@ -19,7 +20,7 @@ import (
 // GET /api/v1/counties/:slug/constituencies - constituencies in a county (FeatureCollection)
 // GET /api/v1/constituencies/:slug/wards - wards in a constituency (FeatureCollection)
 // POST /api/v1/spatial/intersect - submit { "lat": <float>, "lng": <float> } and return matching ward/constituency/county (FeatureCollection)
-func SetupRouter(svc *service.CountyService) *gin.Engine {
+func SetupRouter(svc interface{}) *gin.Engine {
 	r := gin.Default()
 
 	v1 := r.Group("/api/v1")
@@ -27,13 +28,37 @@ func SetupRouter(svc *service.CountyService) *gin.Engine {
 		// List all counties using the service method that returns a FeatureCollection
 		v1.GET("/counties", func(c *gin.Context) {
 			ctx := c.Request.Context()
-			fc, err := svc.ListCountiesAsFeatureCollection(ctx)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+
+			// runtime assertion for ListCounties
+			type listSvc interface {
+				ListCountiesAsFeatureCollection(ctx context.Context) (*geojson.FeatureCollection, error)
+			}
+
+			// Fallback: if svc implements the concrete CountyService, call its method directly
+			if s, ok := svc.(*service.CountyService); ok {
+				fc, err := s.ListCountiesAsFeatureCollection(ctx)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+					return
+				}
+				out, _ := json.Marshal(fc)
+				c.Data(http.StatusOK, "application/geo+json", out)
 				return
 			}
-			out, _ := json.Marshal(fc)
-			c.Data(http.StatusOK, "application/geo+json", out)
+
+			// If svc implements the interface, use it (keeps tests flexible)
+			if s, ok := svc.(listSvc); ok {
+				fc, err := s.ListCountiesAsFeatureCollection(context.Background())
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+					return
+				}
+				out, _ := json.Marshal(fc)
+				c.Data(http.StatusOK, "application/geo+json", out)
+				return
+			}
+
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "ListCountiesAsFeatureCollection not implemented in service"})
 		})
 
 		// The County-by-slug, constituencies, wards and spatial intersect routes depend
@@ -51,7 +76,7 @@ func SetupRouter(svc *service.CountyService) *gin.Engine {
 				GetCountyBySlug(ctx context.Context, slug string) (*domain.County, error)
 			}
 
-			if s, ok := interface{}(svc).(slugSvc); ok {
+			if s, ok := svc.(slugSvc); ok {
 				cnt, err := s.GetCountyBySlug(ctx, slug)
 				if err != nil {
 					c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
@@ -80,7 +105,7 @@ func SetupRouter(svc *service.CountyService) *gin.Engine {
 				}, error)
 			}
 
-			if s, ok := interface{}(svc).(constSvc); ok {
+			if s, ok := svc.(constSvc); ok {
 				list, err := s.ListConstituenciesByCountySlug(ctx, slug)
 				if err != nil {
 					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -109,7 +134,7 @@ func SetupRouter(svc *service.CountyService) *gin.Engine {
 				}, error)
 			}
 
-			if s, ok := interface{}(svc).(wardSvc); ok {
+			if s, ok := svc.(wardSvc); ok {
 				list, err := s.ListWardsByConstituencySlug(ctx, slug)
 				if err != nil {
 					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -140,7 +165,7 @@ func SetupRouter(svc *service.CountyService) *gin.Engine {
 				SpatialIntersect(ctx context.Context, lat, lng float64) (service.SpatialResult, error)
 			}
 
-			if s, ok := interface{}(svc).(spatialSvc); ok {
+			if s, ok := svc.(spatialSvc); ok {
 				res, err := s.SpatialIntersect(ctx, payload.Lat, payload.Lng)
 				if err != nil {
 					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -204,7 +229,7 @@ func SetupRouter(svc *service.CountyService) *gin.Engine {
 				SpatialIntersect(ctx context.Context, lat, lng float64) (service.SpatialResult, error)
 			}
 
-			if s, ok := interface{}(svc).(spatialSvc); ok {
+			if s, ok := svc.(spatialSvc); ok {
 				res, err := s.SpatialIntersect(ctx, lat, lng)
 				if err != nil {
 					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

@@ -62,7 +62,8 @@ func TestLocationEndpoint(t *testing.T) {
 
 	// Build real repository/service (uses noop cache so redis is not required)
 	pgRepo := postgres.NewCountyRepository(pool)
-	svc := service.NewCountyService(pgRepo, &noopCache{})
+	spatialRepo := &repository.SpatialRepository{DB: pool}
+	svc := service.NewCountyService(pgRepo, &noopCache{}, spatialRepo)
 
 	// Build router from the project's handler.SetupRouter
 	r := handler.SetupRouter(svc)

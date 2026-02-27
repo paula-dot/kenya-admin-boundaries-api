@@ -11,8 +11,8 @@ import (
 type Querier interface {
 	// Inserts a new county and converts the incoming GeoJSON payload into a PostGIS geometry.
 	CreateCounty(ctx context.Context, arg CreateCountyParams) (CreateCountyRow, error)
-	// Fetches a specific county and automatically formats the geometry as valid GeoJSON.
-	GetCountyByID(ctx context.Context, id int32) (GetCountyByIDRow, error)
+	// Fetches a specific county by its official code and automatically formats the geometry as valid GeoJSON.
+	GetCountyByCode(ctx context.Context, code string) (GetCountyByCodeRow, error)
 	// Retrieves a list of all counties.
 	ListCounties(ctx context.Context) ([]ListCountiesRow, error)
 }

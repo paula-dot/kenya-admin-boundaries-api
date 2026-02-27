@@ -47,32 +47,29 @@ func (q *Queries) CreateCounty(ctx context.Context, arg CreateCountyParams) (Cre
 	return i, err
 }
 
-const getCountyByID = `-- name: GetCountyByID :one
+const getCountyByCode = `-- name: GetCountyByCode :one
 SELECT
-    id,
-    code,
-    name,
+    county_code,
+    county_name,
     ST_AsGeoJSON(geom)::jsonb AS geojson,
     created_at
 FROM counties
-WHERE id = $1
+WHERE county_code = $1
 LIMIT 1
 `
 
-type GetCountyByIDRow struct {
-	ID        int32              `json:"id"`
+type GetCountyByCodeRow struct {
 	Code      pgtype.Text        `json:"code"`
 	Name      string             `json:"name"`
 	Geojson   []byte             `json:"geojson"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
 }
 
-// Fetches a specific county and automatically formats the geometry as valid GeoJSON.
-func (q *Queries) GetCountyByID(ctx context.Context, id int32) (GetCountyByIDRow, error) {
-	row := q.db.QueryRow(ctx, getCountyByID, id)
-	var i GetCountyByIDRow
+// Fetches a specific county by its official code and automatically formats the geometry as valid GeoJSON.
+func (q *Queries) GetCountyByCode(ctx context.Context, code string) (GetCountyByCodeRow, error) {
+	row := q.db.QueryRow(ctx, getCountyByCode, code)
+	var i GetCountyByCodeRow
 	err := row.Scan(
-		&i.ID,
 		&i.Code,
 		&i.Name,
 		&i.Geojson,

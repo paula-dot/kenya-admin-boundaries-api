@@ -2,7 +2,6 @@ package handler
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -23,15 +22,8 @@ func NewCountyHandler(countyService *service.CountyService) *CountyHandler {
 
 // GetCounty retrieves a single county as a GeoJSON Feature.
 func (h *CountyHandler) GetCounty(c *gin.Context) {
-	idParam := c.Param("id")
-	id64, err := strconv.ParseInt(idParam, 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid county ID format. Must be an integer."})
-		return
-	}
-	id := int32(id64)
-
-	feature, err := h.countyService.GetCountyAsFeature(c.Request.Context(), id)
+	code := c.Param("slug")
+	feature, err := h.countyService.GetCountyAsFeature(c.Request.Context(), code)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve county"})
 		return

@@ -14,7 +14,7 @@ import (
 // CountyRepository defines the required database operations.
 // The PostgreSQL implementation will satisfy this interface.
 type CountyRepository interface {
-	GetCountyByID(ctx context.Context, id int32) (*domain.County, error)
+	GetCountyByCode(ctx context.Context, code string) (*domain.County, error)
 	ListCounties(ctx context.Context) ([]*domain.County, error)
 }
 
@@ -47,9 +47,9 @@ func NewCountyService(repo CountyRepository, cache CacheRepository, spatial repo
 	}
 }
 
-// GetCountyAsFeature fetches a county and formats it as a standard GeoJSON Feature.
-func (s *CountyService) GetCountyAsFeature(ctx context.Context, id int32) (*geojson.Feature, error) {
-	cacheKey := fmt.Sprintf("county:feature:%d", id)
+// GetCountyAsFeature fetches a county by its official code and formats it as a standard GeoJSON Feature.
+func (s *CountyService) GetCountyAsFeature(ctx context.Context, code string) (*geojson.Feature, error) {
+	cacheKey := fmt.Sprintf("county:feature:%s", code)
 
 	// 1. Check the cache
 	cachedData, err := s.cache.Get(ctx, cacheKey)
@@ -62,7 +62,7 @@ func (s *CountyService) GetCountyAsFeature(ctx context.Context, id int32) (*geoj
 	}
 
 	// 2. Cache Miss: Fetch from PostgreSQL
-	county, err := s.repo.GetCountyByID(ctx, id)
+	county, err := s.repo.GetCountyByCode(ctx, code)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch county from db: %w", err)
 	}
@@ -88,6 +88,11 @@ func (s *CountyService) GetCountyAsFeature(ctx context.Context, id int32) (*geoj
 	}
 
 	return feature, nil
+}
+
+// GetCountyBySlug is an adapter that allows the router to perform a slug/code lookup.
+func (s *CountyService) GetCountyBySlug(ctx context.Context, slug string) (*domain.County, error) {
+	return s.repo.GetCountyByCode(ctx, slug)
 }
 
 // ListCountiesAsFeatureCollection fetches all counties and packages them for Leaflet.js.

@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/paula-dot/kenya-admin-boundaries-api/internal/domain"
+	"github.com/paula-dot/kenya-admin-boundaries-api/internal/service"
 	"github.com/paula-dot/kenya-admin-boundaries-api/pkg/geojson"
 )
 
@@ -32,16 +33,8 @@ func (m *mockService) GetCountyBySlug(ctx context.Context, slug string) (*domain
 	}, nil
 }
 
-func (m *mockService) SpatialIntersect(ctx context.Context, lat, lng float64) (struct {
-	Ward         *domain.Ward
-	Constituency *domain.Constituency
-	County       *domain.County
-}, error) {
-	return struct {
-		Ward         *domain.Ward
-		Constituency *domain.Constituency
-		County       *domain.County
-	}{
+func (m *mockService) SpatialIntersect(ctx context.Context, lat, lng float64) (service.SpatialResult, error) {
+	return service.SpatialResult{
 		Ward:         nil,
 		Constituency: nil,
 		County:       &domain.County{ID: 1, Name: "TestCounty", Geometry: []byte(`{"type":"Point","coordinates":[0,0]}`)},
