@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -154,6 +155,72 @@ func SetupRouter(svc *service.CountyService) *gin.Engine {
 				var features []interface{}
 				if res.Ward != nil {
 					// domain.Ward exposes GeoJSON as a string field; convert to []byte for the helper
+					features = append(features, buildFeature([]byte(res.Ward.GeoJSON), map[string]interface{}{
+						"type": "ward",
+						"id":   res.Ward.ID,
+						"name": res.Ward.Name,
+					}))
+				}
+				if res.Constituency != nil {
+					features = append(features, buildFeature([]byte(res.Constituency.GeoJSON), map[string]interface{}{
+						"type": "constituency",
+						"id":   res.Constituency.ID,
+						"name": res.Constituency.Name,
+					}))
+				}
+				if res.County != nil {
+					features = append(features, buildFeature(res.County.Geometry, map[string]interface{}{
+						"type": "county",
+						"id":   res.County.ID,
+						"name": res.County.Name,
+					}))
+				}
+
+				fc := map[string]interface{}{
+					"type":     "FeatureCollection",
+					"features": features,
+				}
+				out, _ := json.Marshal(fc)
+				c.Data(http.StatusOK, "application/geo+json", out)
+				return
+			}
+
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "SpatialIntersect not implemented in service"})
+		})
+
+		// GET /api/v1/location (query params lat,lng) - runtime assertion against spatialSvc
+		v1.GET("/location", func(c *gin.Context) {
+			latStr := c.Query("lat")
+			lngStr := c.Query("lng")
+			if latStr == "" || lngStr == "" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "lat and lng query parameters are required"})
+				return
+			}
+			lat, err1 := strconv.ParseFloat(latStr, 64)
+			lng, err2 := strconv.ParseFloat(lngStr, 64)
+			if err1 != nil || err2 != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "lat and lng must be valid floats"})
+				return
+			}
+			ctx := c.Request.Context()
+
+			type spatialSvc interface {
+				SpatialIntersect(ctx context.Context, lat, lng float64) (struct {
+					Ward         *domain.Ward
+					Constituency *domain.Constituency
+					County       *domain.County
+				}, error)
+			}
+
+			if s, ok := interface{}(svc).(spatialSvc); ok {
+				res, err := s.SpatialIntersect(ctx, lat, lng)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+					return
+				}
+
+				var features []interface{}
+				if res.Ward != nil {
 					features = append(features, buildFeature([]byte(res.Ward.GeoJSON), map[string]interface{}{
 						"type": "ward",
 						"id":   res.Ward.ID,

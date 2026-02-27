@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
@@ -11,16 +12,23 @@ import (
 
 	"github.com/paula-dot/kenya-admin-boundaries-api/internal/config"
 	"github.com/paula-dot/kenya-admin-boundaries-api/internal/handler"
+	"github.com/paula-dot/kenya-admin-boundaries-api/internal/repository"
 	"github.com/paula-dot/kenya-admin-boundaries-api/internal/repository/postgres"
 	redisRepo "github.com/paula-dot/kenya-admin-boundaries-api/internal/repository/redis"
 	"github.com/paula-dot/kenya-admin-boundaries-api/internal/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
-
-	"github.com/paula-dot/kenya-admin-boundaries-api/internal/repository"
-	"github.com/paula-dot/kenya-admin-boundaries-api/pkg/db"
 )
+
+// noopCache is used when Redis is not configured or fails to initialize in dev.
+// It implements the CacheRepository interface used by service.NewCountyService.
+type noopCache struct{}
+
+func (n *noopCache) Get(ctx context.Context, key string) ([]byte, error) { return nil, nil }
+func (n *noopCache) Set(ctx context.Context, key string, value []byte, ttl time.Duration) error {
+	return nil
+}
 
 func main() {
 	// 1. Initialize Context
@@ -36,7 +44,20 @@ func main() {
 		cfg.Port = "8080"
 	}
 	if cfg.DBUrl == "" {
+		// keep a sensible fallback for environments where .env is not present
 		cfg.DBUrl = "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"
+	}
+
+	// Print final DSN but redact the password when possible
+	if u, err := url.Parse(cfg.DBUrl); err == nil {
+		if u.User != nil {
+			username := u.User.Username()
+			// replace password with REDACTED for safe logging
+			u.User = url.UserPassword(username, "REDACTED")
+		}
+		log.Printf("Using DATABASE_URL: %s\n", u.String())
+	} else {
+		log.Printf("Using DATABASE_URL (unparsed): %s\n", cfg.DBUrl)
 	}
 
 	// 3. Database Connection Pooling (pgxpool)
@@ -54,12 +75,25 @@ func main() {
 	// 4. Dependency Injection Setup
 	pgRepo := postgres.NewCountyRepository(dbPool)
 
-	cacheRepo, err := redisRepo.NewCacheRepository(cfg.RedisURL)
-	if err != nil {
-		log.Fatalf("Unable to initialize redis cache: %v\n", err)
+	// Initialize redis cache if configured; otherwise fall back to noopCache
+	var cacheRepo service.CacheRepository
+	if cfg.RedisURL == "" {
+		log.Println("REDIS_URL not set; using noop cache (development mode)")
+		cacheRepo = &noopCache{}
+	} else {
+		r, err := redisRepo.NewCacheRepository(cfg.RedisURL)
+		if err != nil {
+			log.Printf("Unable to initialize redis cache: %v; falling back to noop cache\n", err)
+			cacheRepo = &noopCache{}
+		} else {
+			cacheRepo = r
+		}
 	}
 
-	svc := service.NewCountyService(pgRepo, cacheRepo)
+	// spatial repository (used by handlers for intersection lookups)
+	spatialRepo := &repository.SpatialRepository{DB: dbPool}
+
+	svc := service.NewCountyService(pgRepo, cacheRepo, spatialRepo)
 
 	// wire svc into handlers/router
 	router := handler.SetupRouter(svc)
@@ -72,20 +106,22 @@ func main() {
 		})
 	})
 
-	// Additional spatial repository and handler wiring (user requested append)
-	// Inside main()
-	// NOTE: these lines assume packages `pkg/db`, `internal/repository` and `internal/handler`
-	// expose the referenced symbols. Adjust imports/paths if your project differs.
-	dbPool2 := db.Connect("postgresql://postgres:password@localhost:5433/spatial_db")
-	repo := &repository.SpatialRepository{DB: dbPool2}
-	apiHandler := &handler.APIHandler{Repo: repo}
+	// Expose routes list for quick debugging
+	router.GET("/__routes", func(c *gin.Context) {
+		routes := router.Routes()
+		type simpleRoute struct {
+			Method string `json:"method"`
+			Path   string `json:"path"`
+		}
+		out := make([]simpleRoute, 0, len(routes))
+		for _, r := range routes {
+			out = append(out, simpleRoute{Method: r.Method, Path: r.Path})
+		}
+		c.JSON(http.StatusOK, out)
+	})
 
-	// If SetupRouter created route groups `v1` and `spatial` these show how to wire them.
-	// Otherwise you may need to adapt to your router structure.
-	v1 := router.Group("/v1")
-	spatial := v1.Group("/spatial")
-	v1.GET("/counties/:slug", apiHandler.GetCountyBySlug)
-	spatial.POST("/intersect", apiHandler.CheckIntersection)
+	// Note: route registration happens inside SetupRouter. Avoid registering the
+	// same routes again here to prevent duplicate route registration panics.
 
 	// 5. Server Initialization
 	srv := &http.Server{
