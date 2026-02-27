@@ -83,16 +83,14 @@ func (q *Queries) GetCountyByID(ctx context.Context, id int32) (GetCountyByIDRow
 
 const listCounties = `-- name: ListCounties :many
 SELECT
-    id,
-    code,
-    name,
+    county_code,
+    county_name,
     ST_AsGeoJSON(geom)::jsonb AS geojson
 FROM counties
-ORDER BY name
+ORDER BY county_code::INTEGER ASC
 `
 
 type ListCountiesRow struct {
-	ID      int32       `json:"id"`
 	Code    pgtype.Text `json:"code"`
 	Name    string      `json:"name"`
 	Geojson []byte      `json:"geojson"`
@@ -109,7 +107,6 @@ func (q *Queries) ListCounties(ctx context.Context) ([]ListCountiesRow, error) {
 	for rows.Next() {
 		var i ListCountiesRow
 		if err := rows.Scan(
-			&i.ID,
 			&i.Code,
 			&i.Name,
 			&i.Geojson,

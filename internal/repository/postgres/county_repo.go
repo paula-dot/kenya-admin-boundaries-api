@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -69,8 +70,14 @@ func (r *CountyRepo) ListCounties(ctx context.Context) ([]*domain.County, error)
 			code = row.Code.String
 		}
 
+		// Try to parse the official county code into an integer to use as the ID
+		var idVal int32 = 0
+		if parsed, err := strconv.Atoi(code); err == nil {
+			idVal = int32(parsed)
+		}
+
 		c := &domain.County{
-			ID:       row.ID,
+			ID:       idVal,
 			Code:     code,
 			Name:     row.Name,
 			Geometry: row.Geojson,

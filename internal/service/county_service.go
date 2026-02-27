@@ -23,6 +23,14 @@ type CacheRepository interface {
 	Set(ctx context.Context, key string, value []byte, ttl time.Duration) error
 }
 
+// SpatialResult is the named return type used by SpatialIntersect.
+// Using a named type allows runtime type assertions in handlers to succeed.
+type SpatialResult struct {
+	Ward         *domain.Ward
+	Constituency *domain.Constituency
+	County       *domain.County
+}
+
 // CountyService orchestrates business logic and data formatting.
 type CountyService struct {
 	repo        CountyRepository
@@ -108,18 +116,10 @@ func (s *CountyService) ListCountiesAsFeatureCollection(ctx context.Context) (*g
 }
 
 // SpatialIntersect implements the runtime interface used by the router.
-// It returns up to Ward, Constituency and County wrapped in an anonymous struct
-// matching the router's expected shape.
-func (s *CountyService) SpatialIntersect(ctx context.Context, lat, lng float64) (struct {
-	Ward         *domain.Ward
-	Constituency *domain.Constituency
-	County       *domain.County
-}, error) {
-	var out struct {
-		Ward         *domain.Ward
-		Constituency *domain.Constituency
-		County       *domain.County
-	}
+// It returns up to Ward, Constituency and County wrapped in a named SpatialResult
+// so handlers can perform runtime assertions against the service.
+func (s *CountyService) SpatialIntersect(ctx context.Context, lat, lng float64) (SpatialResult, error) {
+	var out SpatialResult
 	if s.spatialRepo == nil {
 		return out, fmt.Errorf("spatial repository not configured")
 	}

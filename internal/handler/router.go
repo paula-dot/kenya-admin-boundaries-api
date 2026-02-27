@@ -137,11 +137,7 @@ func SetupRouter(svc *service.CountyService) *gin.Engine {
 			ctx := c.Request.Context()
 
 			type spatialSvc interface {
-				SpatialIntersect(ctx context.Context, lat, lng float64) (struct {
-					Ward         *domain.Ward
-					Constituency *domain.Constituency
-					County       *domain.County
-				}, error)
+				SpatialIntersect(ctx context.Context, lat, lng float64) (service.SpatialResult, error)
 			}
 
 			if s, ok := interface{}(svc).(spatialSvc); ok {
@@ -205,11 +201,7 @@ func SetupRouter(svc *service.CountyService) *gin.Engine {
 			ctx := c.Request.Context()
 
 			type spatialSvc interface {
-				SpatialIntersect(ctx context.Context, lat, lng float64) (struct {
-					Ward         *domain.Ward
-					Constituency *domain.Constituency
-					County       *domain.County
-				}, error)
+				SpatialIntersect(ctx context.Context, lat, lng float64) (service.SpatialResult, error)
 			}
 
 			if s, ok := interface{}(svc).(spatialSvc); ok {

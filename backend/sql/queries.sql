@@ -21,11 +21,10 @@ WHERE id = $1
 LIMIT 1;
 
 -- name: ListCounties :many
--- Retrieves a list of all counties.
+-- Retrieves a list of all counties. Updated to use county_code/county_name and numeric ordering.
 SELECT
-    id,
-    code,
-    name,
+    county_code,
+    county_name,
     ST_AsGeoJSON(geom)::jsonb AS geojson
 FROM counties
-ORDER BY name;
+ORDER BY county_code::INTEGER ASC;
