@@ -4,9 +4,11 @@ CREATE EXTENSION IF NOT EXISTS postgis;
 -- 1. Counties (Geometry included)
 CREATE TABLE counties (
     id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
+    county_code VARCHAR(50) UNIQUE, -- Official government code (new column used by sqlc queries)
+    county_name VARCHAR(100) NOT NULL, -- New column used by sqlc queries
+    name VARCHAR(100) NOT NULL, -- kept for backward compatibility
     slug VARCHAR(100) UNIQUE NOT NULL,
-    code VARCHAR(10) UNIQUE, -- Official government code
+    code VARCHAR(10) UNIQUE, -- legacy Official government code
     geom geometry(MultiPolygon, 4326),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
      );

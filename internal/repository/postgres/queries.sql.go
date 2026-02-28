@@ -18,17 +18,16 @@ VALUES (
         $2,
         ST_Multi(ST_GeomFromGeoJSON($3::text))
        )
-RETURNING id, code, name, created_at
+RETURNING code, name, created_at
 `
 
 type CreateCountyParams struct {
-	Code    pgtype.Text `json:"code"`
-	Name    string      `json:"name"`
-	Column3 string      `json:"column_3"`
+	CountyCode pgtype.Text `json:"county_code"`
+	CountyName string      `json:"county_name"`
+	Column3    string      `json:"column_3"`
 }
 
 type CreateCountyRow struct {
-	ID        int32              `json:"id"`
 	Code      pgtype.Text        `json:"code"`
 	Name      string             `json:"name"`
 	CreatedAt pgtype.Timestamptz `json:"created_at"`
@@ -36,10 +35,9 @@ type CreateCountyRow struct {
 
 // Inserts a new county and converts the incoming GeoJSON payload into a PostGIS geometry.
 func (q *Queries) CreateCounty(ctx context.Context, arg CreateCountyParams) (CreateCountyRow, error) {
-	row := q.db.QueryRow(ctx, createCounty, arg.Code, arg.Name, arg.Column3)
+	row := q.db.QueryRow(ctx, createCounty, arg.CountyCode, arg.CountyName, arg.Column3)
 	var i CreateCountyRow
 	err := row.Scan(
-		&i.ID,
 		&i.Code,
 		&i.Name,
 		&i.CreatedAt,
@@ -49,12 +47,12 @@ func (q *Queries) CreateCounty(ctx context.Context, arg CreateCountyParams) (Cre
 
 const getCountyByCode = `-- name: GetCountyByCode :one
 SELECT
-    county_code,
-    county_name,
+    code,
+    name,
     ST_AsGeoJSON(geom)::jsonb AS geojson,
     created_at
 FROM counties
-WHERE county_code = $1
+WHERE code = $1
 LIMIT 1
 `
 
@@ -80,11 +78,11 @@ func (q *Queries) GetCountyByCode(ctx context.Context, code string) (GetCountyBy
 
 const listCounties = `-- name: ListCounties :many
 SELECT
-    county_code,
-    county_name,
+    code,
+    name,
     ST_AsGeoJSON(geom)::jsonb AS geojson
 FROM counties
-ORDER BY county_code::INTEGER ASC
+ORDER BY (code)::INTEGER ASC
 `
 
 type ListCountiesRow struct {

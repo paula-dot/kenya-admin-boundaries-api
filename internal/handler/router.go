@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -22,6 +23,22 @@ import (
 // POST /api/v1/spatial/intersect - submit { "lat": <float>, "lng": <float> } and return matching ward/constituency/county (FeatureCollection)
 func SetupRouter(svc interface{}) *gin.Engine {
 	r := gin.Default()
+
+	// Debug middleware: log raw request info to help diagnose unexpected path rewrites
+	// (kept minimal and only enabled in development). It logs RequestURI, URL.Path
+	// and a few proxy headers which often cause path-prefixing issues.
+	r.Use(func(c *gin.Context) {
+		log.Printf("[REQ] Method=%s RequestURI=%s URL.Path=%s Host=%s Referer=%s X-Forwarded-Host=%s X-Forwarded-Proto=%s\n",
+			c.Request.Method,
+			c.Request.RequestURI,
+			c.Request.URL.Path,
+			c.Request.Host,
+			c.GetHeader("Referer"),
+			c.GetHeader("X-Forwarded-Host"),
+			c.GetHeader("X-Forwarded-Proto"),
+		)
+		c.Next()
+	})
 
 	v1 := r.Group("/api/v1")
 	{

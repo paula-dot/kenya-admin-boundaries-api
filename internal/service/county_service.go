@@ -91,7 +91,55 @@ func (s *CountyService) GetCountyAsFeature(ctx context.Context, code string) (*g
 }
 
 // GetCountyBySlug is an adapter that allows the router to perform a slug/code lookup.
+// We prefer using the spatial repository (which queries the `slug` column) when
+// available, falling back to the legacy code-based lookup if necessary.
 func (s *CountyService) GetCountyBySlug(ctx context.Context, slug string) (*domain.County, error) {
+	// Try spatialRepo which performs slug-based lookup and returns a GeoJSON feature
+	if s.spatialRepo != nil {
+		feat, err := s.spatialRepo.GetCountyBySlug(ctx, slug)
+		if err == nil && feat != nil {
+			// Map geojson.Feature -> domain.County
+			var id int32 = 0
+			var codeStr string
+			var nameStr string
+			if feat.Properties != nil {
+				if v, ok := feat.Properties["id"]; ok {
+					switch t := v.(type) {
+					case int:
+						id = int32(t)
+					case int32:
+						id = t
+					case float64:
+						id = int32(t)
+					}
+				}
+				if v, ok := feat.Properties["code"]; ok {
+					if s, ok := v.(string); ok {
+						codeStr = s
+					}
+				}
+				if v, ok := feat.Properties["name"]; ok {
+					if s, ok := v.(string); ok {
+						nameStr = s
+					}
+				}
+			}
+
+			geometryBytes := []byte(nil)
+			if len(feat.Geometry) > 0 {
+				geometryBytes = []byte(feat.Geometry)
+			}
+
+			return &domain.County{
+				ID:       id,
+				Code:     codeStr,
+				Name:     nameStr,
+				Geometry: geometryBytes,
+			}, nil
+		}
+	}
+
+	// Fallback: attempt to treat the slug as an official code
 	return s.repo.GetCountyByCode(ctx, slug)
 }
 
