@@ -4,9 +4,17 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/paula-dot/kenya-admin-boundaries-api/pkg/geojson"
 )
+
+// SpatialRepo defines the subset of repository methods used by HTTP handlers.
+// Having this interface allows handlers to depend on an abstraction for easier testing.
+type SpatialRepo interface {
+	GetCountyBySlug(ctx context.Context, slug string) (*geojson.Feature, error)
+	GetLocationByPoint(ctx context.Context, lng, lat float64) (*IntersectionResult, error)
+}
 
 type SpatialRepository struct {
 	DB *pgxpool.Pool
@@ -51,23 +59,29 @@ func (r *SpatialRepository) GetCountyBySlug(ctx context.Context, slug string) (*
 }
 
 // GetLocationByPoint checks which boundaries intersect with a given Lat/Lng
-func (r *SpatialRepository) GetLocaationByPoint(ctx context.Context, lng, lat float64) (*IntersectionResult, error) {
+func (r *SpatialRepository) GetLocationByPoint(ctx context.Context, lng, lat float64) (*IntersectionResult, error) {
 	// ST_MakePoint takes (Longitude, Latitude). ST_SetSRID sets it to WGS84 standard (4326).
+	// NOTE: Wards are temporarily removed from this query to avoid schema mismatches
+	// while wards-related data is being finalized. We check constituencies and
+	// their parent counties instead and return an empty Ward value.
 	query := `
 		SELECT 
-			  	w.name AS ward,
-				c.name AS constituency,
-				co.name AS county
-		FROM wards w
-		JOIN constituencies c ON w.constituency_id = c.id
+			c.name AS constituency,
+			co.name AS county
+		FROM constituencies c
 		JOIN counties co ON c.county_id = co.id
-		WHERE ST_Intersects(w.geom, ST_SetSRID(ST_MakePoint($1, $2), 4326));
+		WHERE ST_Intersects(c.geom, ST_SetSRID(ST_MakePoint($1, $2), 4326))
+		LIMIT 1;
 	`
 	var result IntersectionResult
-	err := r.DB.QueryRow(ctx, query, lng, lat).Scan(&result.Ward, &result.Constituency, &result.County)
+	// Ward will remain empty for now
+	err := r.DB.QueryRow(ctx, query, lng, lat).Scan(&result.Constituency, &result.County)
 
 	if err != nil {
-		return nil, fmt.Errorf("no boundaries found for these coordinates or database error: %w", err)
+		if err == pgx.ErrNoRows {
+			return nil, pgx.ErrNoRows
+		}
+		return nil, fmt.Errorf("database error: %w", err)
 	}
 	return &result, nil
 }

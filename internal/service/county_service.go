@@ -7,13 +7,14 @@ import (
 	"time"
 
 	"github.com/paula-dot/kenya-admin-boundaries-api/internal/domain"
+	"github.com/paula-dot/kenya-admin-boundaries-api/internal/repository"
 	"github.com/paula-dot/kenya-admin-boundaries-api/pkg/geojson"
 )
 
 // CountyRepository defines the required database operations.
 // The PostgreSQL implementation will satisfy this interface.
 type CountyRepository interface {
-	GetCountyByID(ctx context.Context, id int32) (*domain.County, error)
+	GetCountyByCode(ctx context.Context, code string) (*domain.County, error)
 	ListCounties(ctx context.Context) ([]*domain.County, error)
 }
 
@@ -22,23 +23,33 @@ type CacheRepository interface {
 	Set(ctx context.Context, key string, value []byte, ttl time.Duration) error
 }
 
+// SpatialResult is the named return type used by SpatialIntersect.
+// Using a named type allows runtime type assertions in handlers to succeed.
+type SpatialResult struct {
+	Ward         *domain.Ward
+	Constituency *domain.Constituency
+	County       *domain.County
+}
+
 // CountyService orchestrates business logic and data formatting.
 type CountyService struct {
-	repo  CountyRepository
-	cache CacheRepository
+	repo        CountyRepository
+	cache       CacheRepository
+	spatialRepo repository.SpatialRepo
 }
 
 // NewCountyService is the constructor function.
-func NewCountyService(repo CountyRepository, cache CacheRepository) *CountyService {
+func NewCountyService(repo CountyRepository, cache CacheRepository, spatial repository.SpatialRepo) *CountyService {
 	return &CountyService{
-		repo:  repo,
-		cache: cache,
+		repo:        repo,
+		cache:       cache,
+		spatialRepo: spatial,
 	}
 }
 
-// GetCountyAsFeature fetches a county and formats it as a standard GeoJSON Feature.
-func (s *CountyService) GetCountyAsFeature(ctx context.Context, id int32) (*geojson.Feature, error) {
-	cacheKey := fmt.Sprintf("county:feature:%d", id)
+// GetCountyAsFeature fetches a county by its official code and formats it as a standard GeoJSON Feature.
+func (s *CountyService) GetCountyAsFeature(ctx context.Context, code string) (*geojson.Feature, error) {
+	cacheKey := fmt.Sprintf("county:feature:%s", code)
 
 	// 1. Check the cache
 	cachedData, err := s.cache.Get(ctx, cacheKey)
@@ -51,7 +62,7 @@ func (s *CountyService) GetCountyAsFeature(ctx context.Context, id int32) (*geoj
 	}
 
 	// 2. Cache Miss: Fetch from PostgreSQL
-	county, err := s.repo.GetCountyByID(ctx, id)
+	county, err := s.repo.GetCountyByCode(ctx, code)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch county from db: %w", err)
 	}
@@ -79,6 +90,11 @@ func (s *CountyService) GetCountyAsFeature(ctx context.Context, id int32) (*geoj
 	return feature, nil
 }
 
+// GetCountyBySlug is an adapter that allows the router to perform a slug/code lookup.
+func (s *CountyService) GetCountyBySlug(ctx context.Context, slug string) (*domain.County, error) {
+	return s.repo.GetCountyByCode(ctx, slug)
+}
+
 // ListCountiesAsFeatureCollection fetches all counties and packages them for Leaflet.js.
 func (s *CountyService) ListCountiesAsFeatureCollection(ctx context.Context) (*geojson.FeatureCollection, error) {
 	counties, err := s.repo.ListCounties(ctx)
@@ -102,4 +118,30 @@ func (s *CountyService) ListCountiesAsFeatureCollection(ctx context.Context) (*g
 
 	collection := geojson.NewFeatureCollection(features)
 	return collection, nil
+}
+
+// SpatialIntersect implements the runtime interface used by the router.
+// It returns up to Ward, Constituency and County wrapped in a named SpatialResult
+// so handlers can perform runtime assertions against the service.
+func (s *CountyService) SpatialIntersect(ctx context.Context, lat, lng float64) (SpatialResult, error) {
+	var out SpatialResult
+	if s.spatialRepo == nil {
+		return out, fmt.Errorf("spatial repository not configured")
+	}
+	res, err := s.spatialRepo.GetLocationByPoint(ctx, lng, lat)
+	if err != nil {
+		return out, err
+	}
+	// Map plain names to domain objects. The repository returns names only; if
+	// you have richer objects in DB consider extending the repo to return them.
+	if res.Ward != "" {
+		out.Ward = &domain.Ward{Name: res.Ward}
+	}
+	if res.Constituency != "" {
+		out.Constituency = &domain.Constituency{Name: res.Constituency}
+	}
+	if res.County != "" {
+		out.County = &domain.County{Name: res.County}
+	}
+	return out, nil
 }

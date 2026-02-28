@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -25,28 +26,34 @@ func NewCountyRepository(pool *pgxpool.Pool) *CountyRepo {
 	}
 }
 
-// GetCountyByID executes the SQL query and maps the result to the domain model.
-func (r *CountyRepo) GetCountyByID(ctx context.Context, id int32) (*domain.County, error) {
-	// Call the sqlc-generated GetCountyByID method
-	row, err := r.db.GetCountyByID(ctx, id)
+// GetCountyByCode executes the SQL query and maps the result to the domain model.
+func (r *CountyRepo) GetCountyByCode(ctx context.Context, code string) (*domain.County, error) {
+	// Call the sqlc-generated GetCountyByCode method
+	row, err := r.db.GetCountyByCode(ctx, code)
 	if err != nil {
-		return nil, fmt.Errorf("repository - GetCountyByID failed: %w", err)
+		return nil, fmt.Errorf("repository - GetCountyByCode failed: %w", err)
 	}
 
-	// Convert pgtype.Text to string
-	code := ""
+	// Convert pgtype.Text to string (code is already provided, but normalize from DB)
+	cCode := ""
 	if row.Code.String != "" {
-		code = row.Code.String
+		cCode = row.Code.String
 	}
 
-	// Convert created_at
+	// Map created_at
 	created := time.Time{}
 	created = row.CreatedAt.Time
 
+	// Try to parse code into an integer ID if numeric
+	var idVal int32 = 0
+	if parsed, err := strconv.Atoi(cCode); err == nil {
+		idVal = int32(parsed)
+	}
+
 	// Map the database-specific struct to your pure domain model
 	county := &domain.County{
-		ID:        row.ID,
-		Code:      code,
+		ID:        idVal,
+		Code:      cCode,
 		Name:      row.Name,
 		Geometry:  row.Geojson,
 		CreatedAt: created,
@@ -69,8 +76,14 @@ func (r *CountyRepo) ListCounties(ctx context.Context) ([]*domain.County, error)
 			code = row.Code.String
 		}
 
+		// Try to parse the official county code into an integer to use as the ID
+		var idVal int32 = 0
+		if parsed, err := strconv.Atoi(code); err == nil {
+			idVal = int32(parsed)
+		}
+
 		c := &domain.County{
-			ID:       row.ID,
+			ID:       idVal,
 			Code:     code,
 			Name:     row.Name,
 			Geometry: row.Geojson,
