@@ -70,7 +70,6 @@ All spatial responses are returned as standard `GeoJSON FeatureCollection` objec
 * `GET /api/v1/counties` - List all counties.
 * `GET /api/v1/counties/:slug` - Get specific county boundaries.
 * `GET /api/v1/counties/:slug/constituencies` - Get constituencies within a specific county.
-* `GET /api/v1/constituencies/:slug/wards` - Get wards within a specific constituency.
 * `POST /api/v1/spatial/intersect` - Submit a Point (Lat/Lng) to find exactly which Ward, Constituency, and County it falls inside.
 
 ##  Architecture & Best Practices
