@@ -4,44 +4,15 @@
 
 package postgres
 
-import (
-	"github.com/jackc/pgx/v5/pgtype"
-)
-
 type Constituency struct {
-	ID        int32              `json:"id"`
-	CountyID  int32              `json:"county_id"`
-	Name      string             `json:"name"`
-	Slug      string             `json:"slug"`
-	Code      pgtype.Text        `json:"code"`
-	Geom      interface{}        `json:"geom"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	ConstituencyCode string      `json:"constituency_code"`
+	ConstituencyName string      `json:"constituency_name"`
+	CountyCode       string      `json:"county_code"`
+	Geom             interface{} `json:"geom"`
 }
 
 type County struct {
-	ID        int32              `json:"id"`
-	Name      string             `json:"name"`
-	Slug      string             `json:"slug"`
-	Code      pgtype.Text        `json:"code"`
-	Geom      interface{}        `json:"geom"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-}
-
-type SubCounty struct {
-	ID        int32              `json:"id"`
-	CountyID  int32              `json:"county_id"`
-	Name      string             `json:"name"`
-	Slug      string             `json:"slug"`
-	Code      pgtype.Text        `json:"code"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-}
-
-type Ward struct {
-	ID             int32              `json:"id"`
-	ConstituencyID int32              `json:"constituency_id"`
-	Name           string             `json:"name"`
-	Slug           string             `json:"slug"`
-	Code           pgtype.Text        `json:"code"`
-	Geom           interface{}        `json:"geom"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	CountyCode string      `json:"county_code"`
+	CountyName string      `json:"county_name"`
+	Geom       interface{} `json:"geom"`
 }

@@ -9,11 +9,19 @@ import (
 )
 
 type Querier interface {
+	// Inserts a new constituency and converts the incoming GeoJSON payload into a PostGIS geometry.
+	CreateConstituency(ctx context.Context, arg CreateConstituencyParams) (CreateConstituencyRow, error)
 	// Inserts a new county and converts the incoming GeoJSON payload into a PostGIS geometry.
 	CreateCounty(ctx context.Context, arg CreateCountyParams) (CreateCountyRow, error)
+	// Fetches a specific constituency by its official code.
+	GetConstituencyByCode(ctx context.Context, constituencyCode string) (GetConstituencyByCodeRow, error)
 	// Fetches a specific county by its official code and automatically formats the geometry as valid GeoJSON.
-	GetCountyByCode(ctx context.Context, code string) (GetCountyByCodeRow, error)
-	// Retrieves a list of all counties.
+	GetCountyByCode(ctx context.Context, countyCode string) (GetCountyByCodeRow, error)
+	// Retrieves a list of all constituencies.
+	ListConstituencies(ctx context.Context) ([]ListConstituenciesRow, error)
+	// Retrieves all constituencies belonging to a specific county (Perfect for your nested route!)
+	ListConstituenciesByCounty(ctx context.Context, countyCode string) ([]ListConstituenciesByCountyRow, error)
+	// Retrieves a list of all counties. Uses code/name and numeric ordering.
 	ListCounties(ctx context.Context) ([]ListCountiesRow, error)
 }
 
