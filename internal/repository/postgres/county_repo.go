@@ -34,15 +34,14 @@ func (r *CountyRepo) GetCountyByCode(ctx context.Context, code string) (*domain.
 		return nil, fmt.Errorf("repository - GetCountyByCode failed: %w", err)
 	}
 
-	// Convert pgtype.Text to string (code is already provided, but normalize from DB)
+	// code is now a plain string per sqlc (not a sql.NullString)
 	cCode := ""
-	if row.Code.String != "" {
-		cCode = row.Code.String
+	if row.Code != "" {
+		cCode = row.Code
 	}
 
-	// Map created_at
+	// created_at is no longer returned by the query; use zero value
 	created := time.Time{}
-	created = row.CreatedAt.Time
 
 	// Try to parse code into an integer ID if numeric
 	var idVal int32 = 0
@@ -72,8 +71,9 @@ func (r *CountyRepo) ListCounties(ctx context.Context) ([]*domain.County, error)
 	var counties []*domain.County
 	for _, row := range rows {
 		code := ""
-		if row.Code.String != "" {
-			code = row.Code.String
+		// sqlc now aliases the column as `id` -> struct field `ID`
+		if row.ID != "" {
+			code = row.ID
 		}
 
 		// Try to parse the official county code into an integer to use as the ID

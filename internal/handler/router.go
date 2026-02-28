@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -13,6 +14,14 @@ import (
 	"github.com/paula-dot/kenya-admin-boundaries-api/pkg/geojson"
 )
 
+// AppServices is a small container for wiring explicit handlers in SetupRouter.
+// When passed into SetupRouter callers can avoid runtime assertions and the
+// router will register concrete handlers using these service instances.
+type AppServices struct {
+	County       *service.CountyService
+	Constituency *service.ConstituencyService
+}
+
 // SetupRouter wires service into HTTP routes and returns a *gin.Engine.
 // Routes implemented (from README):
 // GET /api/v1/counties - list all counties (FeatureCollection)
@@ -22,6 +31,22 @@ import (
 // POST /api/v1/spatial/intersect - submit { "lat": <float>, "lng": <float> } and return matching ward/constituency/county (FeatureCollection)
 func SetupRouter(svc interface{}) *gin.Engine {
 	r := gin.Default()
+
+	// Debug middleware: log raw request info to help diagnose unexpected path rewrites
+	// (kept minimal and only enabled in development). It logs RequestURI, URL.Path
+	// and a few proxy headers which often cause path-prefixing issues.
+	r.Use(func(c *gin.Context) {
+		log.Printf("[REQ] Method=%s RequestURI=%s URL.Path=%s Host=%s Referer=%s X-Forwarded-Host=%s X-Forwarded-Proto=%s\n",
+			c.Request.Method,
+			c.Request.RequestURI,
+			c.Request.URL.Path,
+			c.Request.Host,
+			c.GetHeader("Referer"),
+			c.GetHeader("X-Forwarded-Host"),
+			c.GetHeader("X-Forwarded-Proto"),
+		)
+		c.Next()
+	})
 
 	v1 := r.Group("/api/v1")
 	{
@@ -91,34 +116,41 @@ func SetupRouter(svc interface{}) *gin.Engine {
 			c.JSON(http.StatusNotImplemented, gin.H{"error": "GetCountyBySlug not implemented in service"})
 		})
 
-		// GET /api/v1/counties/:slug/constituencies
-		v1.GET("/counties/:slug/constituencies", func(c *gin.Context) {
-			slug := c.Param("slug")
-			ctx := c.Request.Context()
+		// Register constituencies by county route. Prefer explicit handler wiring
+		// when caller passed an *AppServices. Fall back to the existing runtime
+		// assertion behaviour for test flexibility.
+		if svcApp, ok := svc.(*AppServices); ok && svcApp.Constituency != nil {
+			ch := NewConstituencyHandler(svcApp.Constituency)
+			v1.GET("/counties/:slug/constituencies", ch.ListByCounty)
+		} else {
+			v1.GET("/counties/:slug/constituencies", func(c *gin.Context) {
+				slug := c.Param("slug")
+				ctx := c.Request.Context()
 
-			type constSvc interface {
-				ListConstituenciesByCountySlug(ctx context.Context, slug string) ([]struct {
-					ID       int32
-					Slug     string
-					Name     string
-					Geometry []byte
-				}, error)
-			}
+				type constSvc interface {
+					ListConstituenciesByCountySlug(ctx context.Context, slug string) ([]struct {
+						ID       int32
+						Slug     string
+						Name     string
+						Geometry []byte
+					}, error)
+				}
 
-			if s, ok := svc.(constSvc); ok {
-				list, err := s.ListConstituenciesByCountySlug(ctx, slug)
-				if err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				if s, ok := svc.(constSvc); ok {
+					list, err := s.ListConstituenciesByCountySlug(ctx, slug)
+					if err != nil {
+						c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+						return
+					}
+					fc := buildFeatureCollectionFromConstituencies(list)
+					out, _ := json.Marshal(fc)
+					c.Data(http.StatusOK, "application/geo+json", out)
 					return
 				}
-				fc := buildFeatureCollectionFromConstituencies(list)
-				out, _ := json.Marshal(fc)
-				c.Data(http.StatusOK, "application/geo+json", out)
-				return
-			}
 
-			c.JSON(http.StatusNotImplemented, gin.H{"error": "ListConstituenciesByCountySlug not implemented in service"})
-		})
+				c.JSON(http.StatusNotImplemented, gin.H{"error": "ListConstituenciesByCountySlug not implemented in service"})
+			})
+		}
 
 		// GET /api/v1/constituencies/:slug/wards
 		v1.GET("/constituencies/:slug/wards", func(c *gin.Context) {
@@ -201,6 +233,7 @@ func SetupRouter(svc interface{}) *gin.Engine {
 					"type":     "FeatureCollection",
 					"features": features,
 				}
+
 				out, _ := json.Marshal(fc)
 				c.Data(http.StatusOK, "application/geo+json", out)
 				return

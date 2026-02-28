@@ -7,93 +7,270 @@ package postgres
 
 import (
 	"context"
-
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const createConstituency = `-- name: CreateConstituency :one
+INSERT INTO constituencies (constituency_code, constituency_name, county_code, geom)
+VALUES (
+        $1,
+        $2,
+        $3,
+        ST_Multi(ST_GeomFromGeoJSON($4::text))
+       )
+RETURNING constituency_code AS code, constituency_name AS name
+`
+
+type CreateConstituencyParams struct {
+	ConstituencyCode string `json:"constituency_code"`
+	ConstituencyName string `json:"constituency_name"`
+	CountyCode       string `json:"county_code"`
+	Column4          string `json:"column_4"`
+}
+
+type CreateConstituencyRow struct {
+	Code string `json:"code"`
+	Name string `json:"name"`
+}
+
+// Inserts a new constituency and converts the incoming GeoJSON payload into a PostGIS geometry.
+func (q *Queries) CreateConstituency(ctx context.Context, arg CreateConstituencyParams) (CreateConstituencyRow, error) {
+	row := q.db.QueryRow(ctx, createConstituency,
+		arg.ConstituencyCode,
+		arg.ConstituencyName,
+		arg.CountyCode,
+		arg.Column4,
+	)
+	var i CreateConstituencyRow
+	err := row.Scan(&i.Code, &i.Name)
+	return i, err
+}
+
 const createCounty = `-- name: CreateCounty :one
-INSERT INTO counties (code, name, geom)
+INSERT INTO counties (county_code, county_name, geom)
 VALUES (
         $1,
         $2,
         ST_Multi(ST_GeomFromGeoJSON($3::text))
        )
-RETURNING id, code, name, created_at
+RETURNING county_code AS code, county_name AS name
 `
 
 type CreateCountyParams struct {
-	Code    pgtype.Text `json:"code"`
-	Name    string      `json:"name"`
-	Column3 string      `json:"column_3"`
+	CountyCode string `json:"county_code"`
+	CountyName string `json:"county_name"`
+	Column3    string `json:"column_3"`
 }
 
 type CreateCountyRow struct {
-	ID        int32              `json:"id"`
-	Code      pgtype.Text        `json:"code"`
-	Name      string             `json:"name"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	Code string `json:"code"`
+	Name string `json:"name"`
 }
 
 // Inserts a new county and converts the incoming GeoJSON payload into a PostGIS geometry.
 func (q *Queries) CreateCounty(ctx context.Context, arg CreateCountyParams) (CreateCountyRow, error) {
-	row := q.db.QueryRow(ctx, createCounty, arg.Code, arg.Name, arg.Column3)
+	row := q.db.QueryRow(ctx, createCounty, arg.CountyCode, arg.CountyName, arg.Column3)
 	var i CreateCountyRow
+	err := row.Scan(&i.Code, &i.Name)
+	return i, err
+}
+
+const getConstituencyByCode = `-- name: GetConstituencyByCode :one
+SELECT
+    constituency_code AS id,
+    constituency_name AS name,
+    county_code,
+    ST_AsGeoJSON(geom)::jsonb AS geojson
+FROM constituencies
+WHERE constituency_code = $1
+LIMIT 1
+`
+
+type GetConstituencyByCodeRow struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	CountyCode string `json:"county_code"`
+	Geojson    []byte `json:"geojson"`
+}
+
+// Fetches a specific constituency by its official code.
+func (q *Queries) GetConstituencyByCode(ctx context.Context, constituencyCode string) (GetConstituencyByCodeRow, error) {
+	row := q.db.QueryRow(ctx, getConstituencyByCode, constituencyCode)
+	var i GetConstituencyByCodeRow
 	err := row.Scan(
 		&i.ID,
-		&i.Code,
 		&i.Name,
-		&i.CreatedAt,
+		&i.CountyCode,
+		&i.Geojson,
 	)
 	return i, err
 }
 
 const getCountyByCode = `-- name: GetCountyByCode :one
 SELECT
-    county_code,
-    county_name,
-    ST_AsGeoJSON(geom)::jsonb AS geojson,
-    created_at
+    county_code AS code,
+    county_name AS name,
+    ST_AsGeoJSON(geom)::jsonb AS geojson
 FROM counties
 WHERE county_code = $1
 LIMIT 1
 `
 
 type GetCountyByCodeRow struct {
-	Code      pgtype.Text        `json:"code"`
-	Name      string             `json:"name"`
-	Geojson   []byte             `json:"geojson"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	Code    string `json:"code"`
+	Name    string `json:"name"`
+	Geojson []byte `json:"geojson"`
 }
 
 // Fetches a specific county by its official code and automatically formats the geometry as valid GeoJSON.
-func (q *Queries) GetCountyByCode(ctx context.Context, code string) (GetCountyByCodeRow, error) {
-	row := q.db.QueryRow(ctx, getCountyByCode, code)
+func (q *Queries) GetCountyByCode(ctx context.Context, countyCode string) (GetCountyByCodeRow, error) {
+	row := q.db.QueryRow(ctx, getCountyByCode, countyCode)
 	var i GetCountyByCodeRow
+	err := row.Scan(&i.Code, &i.Name, &i.Geojson)
+	return i, err
+}
+
+const getIntersectingBoundary = `-- name: GetIntersectingBoundary :one
+SELECT
+    c.county_code,
+    c.county_name,
+    co.constituency_code,
+    co.constituency_name
+FROM constituencies co
+JOIN counties c ON co.county_code = c.county_code
+WHERE ST_Intersects(
+      co.geom,
+      ST_SetSRID(ST_MakePoint($1::float, $2::float), 4326)
+      )
+LIMIT 1
+`
+
+type GetIntersectingBoundaryParams struct {
+	Longitude float64 `json:"longitude"`
+	Latitude  float64 `json:"latitude"`
+}
+
+type GetIntersectingBoundaryRow struct {
+	CountyCode       string `json:"county_code"`
+	CountyName       string `json:"county_name"`
+	ConstituencyCode string `json:"constituency_code"`
+	ConstituencyName string `json:"constituency_name"`
+}
+
+func (q *Queries) GetIntersectingBoundary(ctx context.Context, arg GetIntersectingBoundaryParams) (GetIntersectingBoundaryRow, error) {
+	row := q.db.QueryRow(ctx, getIntersectingBoundary, arg.Longitude, arg.Latitude)
+	var i GetIntersectingBoundaryRow
 	err := row.Scan(
-		&i.Code,
-		&i.Name,
-		&i.Geojson,
-		&i.CreatedAt,
+		&i.CountyCode,
+		&i.CountyName,
+		&i.ConstituencyCode,
+		&i.ConstituencyName,
 	)
 	return i, err
 }
 
+const listConstituencies = `-- name: ListConstituencies :many
+SELECT
+    constituency_code AS id,
+    constituency_name AS name,
+    county_code,
+    ST_AsGeoJSON(geom)::jsonb AS geojson
+FROM constituencies
+ORDER BY constituency_code ASC
+`
+
+type ListConstituenciesRow struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	CountyCode string `json:"county_code"`
+	Geojson    []byte `json:"geojson"`
+}
+
+// Retrieves a list of all constituencies.
+func (q *Queries) ListConstituencies(ctx context.Context) ([]ListConstituenciesRow, error) {
+	rows, err := q.db.Query(ctx, listConstituencies)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListConstituenciesRow{}
+	for rows.Next() {
+		var i ListConstituenciesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.CountyCode,
+			&i.Geojson,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listConstituenciesByCounty = `-- name: ListConstituenciesByCounty :many
+SELECT
+    constituency_code AS id,
+    constituency_name AS name,
+    county_code,
+    ST_AsGeoJSON(geom)::jsonb AS geojson
+FROM constituencies
+WHERE county_code = $1
+ORDER BY constituency_code ASC
+`
+
+type ListConstituenciesByCountyRow struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	CountyCode string `json:"county_code"`
+	Geojson    []byte `json:"geojson"`
+}
+
+// Retrieves all constituencies belonging to a specific county (Perfect for your nested route!)
+func (q *Queries) ListConstituenciesByCounty(ctx context.Context, countyCode string) ([]ListConstituenciesByCountyRow, error) {
+	rows, err := q.db.Query(ctx, listConstituenciesByCounty, countyCode)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListConstituenciesByCountyRow{}
+	for rows.Next() {
+		var i ListConstituenciesByCountyRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.CountyCode,
+			&i.Geojson,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listCounties = `-- name: ListCounties :many
 SELECT
-    county_code,
-    county_name,
+    county_code AS id,
+    county_name AS name,
     ST_AsGeoJSON(geom)::jsonb AS geojson
 FROM counties
-ORDER BY county_code::INTEGER ASC
+ORDER BY county_code ASC
 `
 
 type ListCountiesRow struct {
-	Code    pgtype.Text `json:"code"`
-	Name    string      `json:"name"`
-	Geojson []byte      `json:"geojson"`
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Geojson []byte `json:"geojson"`
 }
 
-// Retrieves a list of all counties.
+// Retrieves a list of all counties. Uses code/name and numeric ordering.
 func (q *Queries) ListCounties(ctx context.Context) ([]ListCountiesRow, error) {
 	rows, err := q.db.Query(ctx, listCounties)
 	if err != nil {
@@ -103,11 +280,7 @@ func (q *Queries) ListCounties(ctx context.Context) ([]ListCountiesRow, error) {
 	items := []ListCountiesRow{}
 	for rows.Next() {
 		var i ListCountiesRow
-		if err := rows.Scan(
-			&i.Code,
-			&i.Name,
-			&i.Geojson,
-		); err != nil {
+		if err := rows.Scan(&i.ID, &i.Name, &i.Geojson); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

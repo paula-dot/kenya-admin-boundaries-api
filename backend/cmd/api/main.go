@@ -74,6 +74,8 @@ func main() {
 
 	// 4. Dependency Injection Setup
 	pgRepo := postgres.NewCountyRepository(dbPool)
+	// create constituency repository and service so router can list constituencies
+	consRepo := postgres.NewConstituencyRepository(dbPool)
 
 	// Initialize redis cache if configured; otherwise fall back to noopCache
 	var cacheRepo service.CacheRepository
@@ -93,7 +95,17 @@ func main() {
 	// spatial repository (used by handlers for intersection lookups)
 	spatialRepo := &repository.SpatialRepository{DB: dbPool}
 
-	svc := service.NewCountyService(pgRepo, cacheRepo, spatialRepo)
+	countySvc := service.NewCountyService(pgRepo, cacheRepo, spatialRepo)
+	consSvc := service.NewConstituencyService(consRepo)
+
+	// Compose a lightweight application service that satisfies multiple runtime
+	// assertions in the router. Router uses type assertions so embedding works well.
+	type appServices struct {
+		*service.CountyService
+		*service.ConstituencyService
+	}
+
+	svc := &appServices{CountyService: countySvc, ConstituencyService: consSvc}
 
 	// wire svc into handlers/router
 	router := handler.SetupRouter(svc)
