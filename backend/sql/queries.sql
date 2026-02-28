@@ -70,4 +70,16 @@ FROM constituencies
 WHERE county_code = $1
 ORDER BY constituency_code ASC;
 
-
+-- name: GetIntersectingBoundary :one
+SELECT
+    c.county_code,
+    c.county_name,
+    co.constituency_code,
+    co.constituency_name
+FROM constituencies co
+JOIN counties c ON co.county_code = c.county_code
+WHERE ST_Intersects(
+      co.geom,
+      ST_SetSRID(ST_MakePoint(@longitude::float, @latitude::float), 4326)
+      )
+LIMIT 1;

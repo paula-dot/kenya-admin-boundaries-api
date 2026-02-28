@@ -129,6 +129,45 @@ func (q *Queries) GetCountyByCode(ctx context.Context, countyCode string) (GetCo
 	return i, err
 }
 
+const getIntersectingBoundary = `-- name: GetIntersectingBoundary :one
+SELECT
+    c.county_code,
+    c.county_name,
+    co.constituency_code,
+    co.constituency_name
+FROM constituencies co
+JOIN counties c ON co.county_code = c.county_code
+WHERE ST_Intersects(
+      co.geom,
+      ST_SetSRID(ST_MakePoint($1::float, $2::float), 4326)
+      )
+LIMIT 1
+`
+
+type GetIntersectingBoundaryParams struct {
+	Longitude float64 `json:"longitude"`
+	Latitude  float64 `json:"latitude"`
+}
+
+type GetIntersectingBoundaryRow struct {
+	CountyCode       string `json:"county_code"`
+	CountyName       string `json:"county_name"`
+	ConstituencyCode string `json:"constituency_code"`
+	ConstituencyName string `json:"constituency_name"`
+}
+
+func (q *Queries) GetIntersectingBoundary(ctx context.Context, arg GetIntersectingBoundaryParams) (GetIntersectingBoundaryRow, error) {
+	row := q.db.QueryRow(ctx, getIntersectingBoundary, arg.Longitude, arg.Latitude)
+	var i GetIntersectingBoundaryRow
+	err := row.Scan(
+		&i.CountyCode,
+		&i.CountyName,
+		&i.ConstituencyCode,
+		&i.ConstituencyName,
+	)
+	return i, err
+}
+
 const listConstituencies = `-- name: ListConstituencies :many
 SELECT
     constituency_code AS id,

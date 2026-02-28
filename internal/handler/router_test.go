@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/paula-dot/kenya-admin-boundaries-api/internal/domain"
@@ -76,5 +77,49 @@ func TestSpatialIntersectRoute(t *testing.T) {
 
 	if ct := w.Header().Get("Content-Type"); ct != "application/geo+json" {
 		t.Fatalf("expected content-type application/geo+json got %s", ct)
+	}
+}
+
+type mockConstSvc struct{}
+
+func (m *mockConstSvc) ListConstituenciesByCountySlug(ctx context.Context, slug string) ([]struct {
+	ID       int32
+	Slug     string
+	Name     string
+	Geometry []byte
+}, error) {
+	return []struct {
+		ID       int32
+		Slug     string
+		Name     string
+		Geometry []byte
+	}{
+		{ID: 123, Slug: "KE001-01", Name: "Test Constituency", Geometry: []byte(`{"type":"Point","coordinates":[36,-1]}`)},
+	}, nil
+}
+
+func TestListConstituenciesByCountyRoute(t *testing.T) {
+	m := &mockConstSvc{}
+	r := SetupRouter(m)
+
+	req := httptest.NewRequest("GET", "/api/v1/counties/KE001/constituencies", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200 got %d: %s", w.Code, w.Body.String())
+	}
+
+	if ct := w.Header().Get("Content-Type"); ct != "application/geo+json" {
+		t.Fatalf("expected content-type application/geo+json got %s", ct)
+	}
+
+	// quick body sanity check: should contain "FeatureCollection" and the name
+	b := w.Body.String()
+	if b == "" {
+		t.Fatalf("empty body returned")
+	}
+	if !strings.Contains(b, "FeatureCollection") || !strings.Contains(b, "Test Constituency") {
+		t.Fatalf("unexpected body: %s", b)
 	}
 }

@@ -17,6 +17,7 @@ type Querier interface {
 	GetConstituencyByCode(ctx context.Context, constituencyCode string) (GetConstituencyByCodeRow, error)
 	// Fetches a specific county by its official code and automatically formats the geometry as valid GeoJSON.
 	GetCountyByCode(ctx context.Context, countyCode string) (GetCountyByCodeRow, error)
+	GetIntersectingBoundary(ctx context.Context, arg GetIntersectingBoundaryParams) (GetIntersectingBoundaryRow, error)
 	// Retrieves a list of all constituencies.
 	ListConstituencies(ctx context.Context) ([]ListConstituenciesRow, error)
 	// Retrieves all constituencies belonging to a specific county (Perfect for your nested route!)
