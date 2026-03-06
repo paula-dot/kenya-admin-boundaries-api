@@ -2,7 +2,12 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"time"
+
+	"github.com/redis/go-redis/v9"
 
 	db "github.com/paula-dot/kenya-admin-boundaries-api/internal/repository/postgres"
 )
@@ -10,11 +15,15 @@ import (
 // SpatialService acts as the bridge between the Gin handler and the Postgres engine
 type SpatialService struct {
 	queries *db.Queries
+	redis   *redis.CLient
 }
 
 // NewSpatialService initializes the service with database access
-func NewSpatialService(q *db.Queries) *SpatialService {
-	return &SpatialService{queries: q}
+func NewSpatialService(q *db.Queries, rdb *redis.Client) *SpatialService {
+	return &SpatialService{
+		queries: q,
+		redis:   rdb,
+	}
 }
 
 // IntersectResponse represents the clean JSON payload returned to the client

@@ -30,17 +30,15 @@ type IntersectionResult struct {
 // GetCountyBySlug fetches a single county and formats it as a GeoJSON Feature
 func (r *SpatialRepository) GetCountyBySlug(ctx context.Context, slug string) (*geojson.Feature, error) {
 	query := `
-		SELECT 
+		SELECT
 			'Feature' AS type,
 			ST_AsGeoJSON(geom)::jsonb AS geometry,
 			json_build_object(
-				'id', id,
-				'name', name,
-				'slug', slug,
-				'code', code
+				'code', county_code,
+				'name', county_name
 			) AS properties
 		FROM counties
-		WHERE slug = $1;
+		WHERE county_code = $1;
 	`
 
 	var feature geojson.Feature
@@ -65,11 +63,11 @@ func (r *SpatialRepository) GetLocationByPoint(ctx context.Context, lng, lat flo
 	// while wards-related data is being finalized. We check constituencies and
 	// their parent counties instead and return an empty Ward value.
 	query := `
-		SELECT 
-			c.name AS constituency,
-			co.name AS county
+		SELECT
+			c.constituency_name AS constituency,
+			co.county_name AS county
 		FROM constituencies c
-		JOIN counties co ON c.county_id = co.id
+		JOIN counties co ON c.county_code = co.county_code
 		WHERE ST_Intersects(c.geom, ST_SetSRID(ST_MakePoint($1, $2), 4326))
 		LIMIT 1;
 	`
