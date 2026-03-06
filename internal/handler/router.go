@@ -20,6 +20,7 @@ import (
 type AppServices struct {
 	County       *service.CountyService
 	Constituency *service.ConstituencyService
+	Spatial      *service.SpatialService
 }
 
 // SetupRouter wires service into HTTP routes and returns a *gin.Engine.
@@ -182,65 +183,71 @@ func SetupRouter(svc interface{}) *gin.Engine {
 		})
 
 		// POST /api/v1/spatial/intersect
-		v1.POST("/spatial/intersect", func(c *gin.Context) {
-			var payload struct {
-				Lat float64 `json:"lat"`
-				Lng float64 `json:"lng"`
-			}
-			if err := c.ShouldBindJSON(&payload); err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
-				return
-			}
-			ctx := c.Request.Context()
+		if svcApp, ok := svc.(*AppServices); ok && svcApp.Spatial != nil {
+			spatialHdlr := NewSpatialHandler(svcApp.Spatial)
+			v1.POST("/spatial/intersect", spatialHdlr.HandleIntersect)
+		} else {
+			// Fallback: runtime assertion for test flexibility
+			v1.POST("/spatial/intersect", func(c *gin.Context) {
+				var payload struct {
+					Lat float64 `json:"lat"`
+					Lng float64 `json:"lng"`
+				}
+				if err := c.ShouldBindJSON(&payload); err != nil {
+					c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
+					return
+				}
+				ctx := c.Request.Context()
 
-			type spatialSvc interface {
-				SpatialIntersect(ctx context.Context, lat, lng float64) (service.SpatialResult, error)
-			}
+				type spatialSvc interface {
+					SpatialIntersect(ctx context.Context, lat, lng float64) (service.SpatialResult, error)
+				}
 
-			if s, ok := svc.(spatialSvc); ok {
-				res, err := s.SpatialIntersect(ctx, payload.Lat, payload.Lng)
-				if err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				if s, ok := svc.(spatialSvc); ok {
+					res, err := s.SpatialIntersect(ctx, payload.Lat, payload.Lng)
+					if err != nil {
+						c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+						return
+					}
+
+					// Build a FeatureCollection containing up to Ward, Constituency, County in that order
+					var features []interface{}
+					if res.Ward != nil {
+						// domain.Ward exposes GeoJSON as a string field; convert to []byte for the helper
+						features = append(features, buildFeature([]byte(res.Ward.GeoJSON), map[string]interface{}{
+							"type": "ward",
+							"id":   res.Ward.ID,
+							"name": res.Ward.Name,
+						}))
+					}
+					if res.Constituency != nil {
+						features = append(features, buildFeature([]byte(res.Constituency.GeoJSON), map[string]interface{}{
+							"type": "constituency",
+							"id":   res.Constituency.ID,
+							"name": res.Constituency.Name,
+						}))
+					}
+					if res.County != nil {
+						features = append(features, buildFeature(res.County.Geometry, map[string]interface{}{
+							"type": "county",
+							"id":   res.County.ID,
+							"name": res.County.Name,
+						}))
+					}
+
+					fc := map[string]interface{}{
+						"type":     "FeatureCollection",
+						"features": features,
+					}
+
+					out, _ := json.Marshal(fc)
+					c.Data(http.StatusOK, "application/geo+json", out)
 					return
 				}
 
-				// Build a FeatureCollection containing up to Ward, Constituency, County in that order
-				var features []interface{}
-				if res.Ward != nil {
-					// domain.Ward exposes GeoJSON as a string field; convert to []byte for the helper
-					features = append(features, buildFeature([]byte(res.Ward.GeoJSON), map[string]interface{}{
-						"type": "ward",
-						"id":   res.Ward.ID,
-						"name": res.Ward.Name,
-					}))
-				}
-				if res.Constituency != nil {
-					features = append(features, buildFeature([]byte(res.Constituency.GeoJSON), map[string]interface{}{
-						"type": "constituency",
-						"id":   res.Constituency.ID,
-						"name": res.Constituency.Name,
-					}))
-				}
-				if res.County != nil {
-					features = append(features, buildFeature(res.County.Geometry, map[string]interface{}{
-						"type": "county",
-						"id":   res.County.ID,
-						"name": res.County.Name,
-					}))
-				}
-
-				fc := map[string]interface{}{
-					"type":     "FeatureCollection",
-					"features": features,
-				}
-
-				out, _ := json.Marshal(fc)
-				c.Data(http.StatusOK, "application/geo+json", out)
-				return
-			}
-
-			c.JSON(http.StatusNotImplemented, gin.H{"error": "SpatialIntersect not implemented in service"})
-		})
+				c.JSON(http.StatusNotImplemented, gin.H{"error": "SpatialIntersect not implemented in service"})
+			})
+		}
 
 		// GET /api/v1/location (query params lat,lng) - runtime assertion against spatialSvc
 		v1.GET("/location", func(c *gin.Context) {
