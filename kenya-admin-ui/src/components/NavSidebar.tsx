@@ -6,8 +6,9 @@ export default function NavSidebar() {
 
   const links = [
     { name: "Getting Started", path: "/", icon: <Book className="w-4 h-4" /> },
-    { name: "Counties API", path: "/counties", icon: <Layers className="w-4 h-4" /> },
-    { name: "Constituencies API", path: "/constituencies", icon: <FileJson className="w-4 h-4" /> },
+    { name: "Counties Endpoint", path: "/counties", icon: <Layers className="w-4 h-4" /> },
+    { name: "Constituencies Endpoint", path: "/constituencies", icon: <FileJson className="w-4 h-4" /> },
+    { name: "Sub-Counties Endpoint", path: "/sub-counties", icon: <FileJson className="w-4 h-4" /> },
     { name: "Spatial Intersect", path: "/spatial", icon: <Code className="w-4 h-4" /> },
     { name: "Interactive Map", path: "/map", icon: <Map className="w-4 h-4" /> },
   ];

@@ -21,6 +21,9 @@ export default function LayerTabs({ activeLayer, onLayerChange }: LayerTabsProps
           <TabsTrigger value="constituencies" className="text-xs font-semibold">
             Constituencies
           </TabsTrigger>
+          <TabsTrigger value="sub-counties" className="text-xs font-semibold">
+            Sub-Counties
+          </TabsTrigger>
         </TabsList>
       </Tabs>
     </div>

@@ -155,25 +155,53 @@ export default function ApiDocs() {
       </section>
 
       <section className="pt-8">
+        <h2 className="text-2xl font-bold border-b pb-2 mb-8">Sub-Counties</h2>
+        <Endpoint 
+          method="GET"
+          path="/api/v1/sub-counties"
+          description="Returns a lightweight JSON array describing all administrative sub-counties."
+          responsePayload={`{
+  "sub_counties": [
+    {
+      "county_code": "KE001",
+      "county_name": "Mombasa",
+      "sub_county_code": "001",
+      "sub_county_name": "Changamwe"
+    }
+  ]
+}`}
+        />
+        <Endpoint 
+          method="GET"
+          path="/api/v1/counties/:slug/sub-counties"
+          description="Returns a lightweight JSON array of sub-counties within a specific county."
+          parameters={[
+            { name: "slug", type: "string", description: "The county code (e.g., KE047 for Nairobi)." }
+          ]}
+          responsePayload={`{
+  "sub_counties": [
+    {
+      "county_code": "KE047",
+      "county_name": "Nairobi",
+      "sub_county_code": "275",
+      "sub_county_name": "Starehe"
+    }
+  ]
+}`}
+        />
+      </section>
+
+      <section className="pt-8">
         <h2 className="text-2xl font-bold border-b pb-2 mb-8">Spatial Intersections</h2>
         
         <Endpoint 
           method="POST"
           path="/api/v1/spatial/intersect"
-          description="Submit a Lat/Lng coordinate pair to find exactly which administrative boundaries (County, Constituency, Ward) the point falls inside. Highly optimized using PostGIS GIST indexes."
+          description="Submit a Lat/Lng coordinate pair to find exactly which administrative boundaries (County, Constituency) the point falls inside. Highly optimized using PostGIS GIST indexes."
           parameters={[]}
           responsePayload={`{
   "type": "FeatureCollection",
   "features": [
-    {
-      "type": "Feature",
-      "geometry": null,
-      "properties": {
-        "id": 1394,
-        "name": "Nairobi Central",
-        "type": "ward"
-      }
-    },
     {
       "type": "Feature",
       "geometry": null,
