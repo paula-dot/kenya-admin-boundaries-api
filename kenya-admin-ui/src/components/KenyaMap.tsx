@@ -1,8 +1,8 @@
 import { MapContainer, TileLayer, GeoJSON, useMap } from "react-leaflet";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import L from "leaflet";
-import type { FeatureCollection } from "geojson";
-import type { GeoJSON as LeafletGeoJSON } from "leaflet";
+import type { FeatureCollection, Feature } from "geojson";
+import type { GeoJSON as LeafletGeoJSON, Layer, PathOptions } from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 type LayerType = "counties" | "constituencies";
@@ -12,6 +12,8 @@ interface KenyaMapProps {
   constituencies: FeatureCollection | null;
   activeLayer: LayerType;
   flyToCode: string | null;
+  selectedCode: string | null;
+  onFeatureSelect: (code: string, name: string) => void;
 }
 
 function FlyToCounty({
@@ -26,13 +28,11 @@ function FlyToCounty({
   useEffect(() => {
     if (!code || !counties) return;
 
-    // Find the feature matching this county code
     const feature = counties.features.find(
       (f) => f.properties?.code === code
     );
     if (!feature) return;
 
-    // Create a temporary GeoJSON layer to get the bounds
     const layer = L.geoJSON(feature as GeoJSON.Feature);
     const bounds = layer.getBounds();
     if (bounds.isValid()) {
@@ -43,14 +43,97 @@ function FlyToCounty({
   return null;
 }
 
+// Style constants
+const COUNTY_COLOR = "#00d4ff";
+const CONSTITUENCY_COLOR = "#ff6b6b";
+
+function getDefaultStyle(activeLayer: LayerType): PathOptions {
+  const color = activeLayer === "counties" ? COUNTY_COLOR : CONSTITUENCY_COLOR;
+  return {
+    color,
+    weight: activeLayer === "counties" ? 2 : 1,
+    fillColor: color,
+    fillOpacity: 0.08,
+  };
+}
+
+function getHighlightStyle(activeLayer: LayerType): PathOptions {
+  const color = activeLayer === "counties" ? COUNTY_COLOR : CONSTITUENCY_COLOR;
+  return {
+    color,
+    weight: 4,
+    fillColor: color,
+    fillOpacity: 0.3,
+  };
+}
+
 export default function KenyaMap({
   counties,
   constituencies,
   activeLayer,
   flyToCode,
+  selectedCode,
+  onFeatureSelect,
 }: KenyaMapProps) {
   const geoJsonRef = useRef<LeafletGeoJSON | null>(null);
   const currentData = activeLayer === "counties" ? counties : constituencies;
+
+  // Update styles when selectedCode changes
+  useEffect(() => {
+    if (!geoJsonRef.current) return;
+
+    geoJsonRef.current.eachLayer((layer: Layer) => {
+      const feature = (layer as L.GeoJSON & { feature: Feature }).feature;
+      const code = feature?.properties?.code;
+      const pathLayer = layer as unknown as L.Path;
+
+      if (code === selectedCode) {
+        pathLayer.setStyle(getHighlightStyle(activeLayer));
+        pathLayer.bringToFront();
+      } else {
+        pathLayer.setStyle(getDefaultStyle(activeLayer));
+      }
+    });
+  }, [selectedCode, activeLayer]);
+
+  const handleEachFeature = useCallback(
+    (feature: Feature, layer: Layer) => {
+      const name = feature.properties?.name || "Unknown";
+      const code = feature.properties?.code || "";
+
+      // Tooltip
+      layer.bindTooltip(`${name} (${code})`, {
+        sticky: true,
+        className: "map-tooltip",
+      });
+
+      // Click → highlight + notify parent
+      layer.on("click", () => {
+        onFeatureSelect(code, name);
+      });
+
+      // Hover effect (subtle brightening)
+      layer.on("mouseover", () => {
+        const pathLayer = layer as unknown as L.Path;
+        if (code !== selectedCode) {
+          pathLayer.setStyle({
+            ...getDefaultStyle(activeLayer),
+            weight: activeLayer === "counties" ? 3 : 2,
+            fillOpacity: 0.15,
+          });
+          pathLayer.bringToFront();
+        }
+      });
+
+      layer.on("mouseout", () => {
+        const pathLayer = layer as unknown as L.Path;
+        if (code !== selectedCode) {
+          pathLayer.setStyle(getDefaultStyle(activeLayer));
+        }
+      });
+    },
+    [activeLayer, onFeatureSelect, selectedCode]
+  );
 
   return (
     <MapContainer
@@ -68,20 +151,8 @@ export default function KenyaMap({
           key={activeLayer}
           ref={geoJsonRef}
           data={currentData}
-          style={() => ({
-            color: activeLayer === "counties" ? "#00d4ff" : "#ff6b6b",
-            weight: activeLayer === "counties" ? 2 : 1,
-            fillColor: activeLayer === "counties" ? "#00d4ff" : "#ff6b6b",
-            fillOpacity: 0.08,
-          })}
-          onEachFeature={(feature, layer) => {
-            const name = feature.properties?.name || "Unknown";
-            const code = feature.properties?.code || "";
-            layer.bindTooltip(`${name} (${code})`, {
-              sticky: true,
-              className: "map-tooltip",
-            });
-          }}
+          style={() => getDefaultStyle(activeLayer)}
+          onEachFeature={handleEachFeature}
         />
       )}
       <FlyToCounty counties={counties} code={flyToCode} />

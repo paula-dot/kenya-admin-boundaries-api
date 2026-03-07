@@ -59,11 +59,7 @@ export default function Sidebar({ onCountySelect }: SidebarProps) {
       .catch((err) => console.error("Failed to load counties:", err));
   }, []);
 
-  const fetchSubCounties = (code: string, name: string) => {
-    // Notify parent for map zoom
-    onCountySelect(code, name);
-
-    // Fetch sub-counties if not already cached
+  const fetchSubCountiesForCode = (code: string) => {
     if (!subCounties[code] && loadingCode !== code) {
       setLoadingCode(code);
       axios
@@ -77,6 +73,11 @@ export default function Sidebar({ onCountySelect }: SidebarProps) {
         .catch((err) => console.error("Failed to load sub-counties:", err))
         .finally(() => setLoadingCode(null));
     }
+  };
+
+  const handleTriggerClick = (code: string, name: string) => {
+    onCountySelect(code, name);
+    fetchSubCountiesForCode(code);
   };
 
   return (
@@ -104,7 +105,7 @@ export default function Sidebar({ onCountySelect }: SidebarProps) {
               <AccordionTrigger
                 className="py-3 px-2 text-sm font-medium hover:no-underline hover:bg-accent/50 rounded-md transition-colors"
                 onClick={() =>
-                  fetchSubCounties(
+                  handleTriggerClick(
                     county.properties.code,
                     county.properties.name
                   )

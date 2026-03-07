@@ -14,6 +14,7 @@ function App() {
   const [constituencies, setConstituencies] = useState<FeatureCollection | null>(null);
   const [activeLayer, setActiveLayer] = useState<LayerType>("counties");
   const [flyToCode, setFlyToCode] = useState<string | null>(null);
+  const [selectedCode, setSelectedCode] = useState<string | null>(null);
 
   useEffect(() => {
     axios
@@ -27,10 +28,16 @@ function App() {
       .catch((err) => console.error("Failed to load constituencies:", err));
   }, []);
 
+  // Sidebar click: zoom + highlight
   const handleCountySelect = (code: string, _name: string) => {
+    setSelectedCode(code);
     setFlyToCode(code);
-    // Reset after a short delay so re-clicking the same county works
     setTimeout(() => setFlyToCode(null), 1000);
+  };
+
+  // Map polygon click: highlight only (no zoom, no sidebar sync)
+  const handleFeatureSelect = (code: string, _name: string) => {
+    setSelectedCode((prev) => (prev === code ? null : code));
   };
 
   return (
@@ -48,6 +55,8 @@ function App() {
           constituencies={constituencies}
           activeLayer={activeLayer}
           flyToCode={flyToCode}
+          selectedCode={selectedCode}
+          onFeatureSelect={handleFeatureSelect}
         />
       </main>
     </div>
