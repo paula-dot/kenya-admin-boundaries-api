@@ -81,6 +81,18 @@ func SetupRouter(svc interface{}, v1Middleware ...gin.HandlerFunc) *gin.Engine {
 				return
 			}
 
+			// Check for AppServices wrapper (used when main.go passes *AppServices)
+			if svcApp, ok := svc.(*AppServices); ok && svcApp.County != nil {
+				fc, err := svcApp.County.ListCountiesAsFeatureCollection(ctx)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+					return
+				}
+				out, _ := json.Marshal(fc)
+				c.Data(http.StatusOK, "application/geo+json", out)
+				return
+			}
+
 			// If svc implements the interface, use it (keeps tests flexible)
 			if s, ok := svc.(listSvc); ok {
 				fc, err := s.ListCountiesAsFeatureCollection(context.Background())
@@ -94,6 +106,24 @@ func SetupRouter(svc interface{}, v1Middleware ...gin.HandlerFunc) *gin.Engine {
 			}
 
 			c.JSON(http.StatusNotImplemented, gin.H{"error": "ListCountiesAsFeatureCollection not implemented in service"})
+		})
+
+		// List all constituencies as a GeoJSON FeatureCollection
+		v1.GET("/constituencies", func(c *gin.Context) {
+			ctx := c.Request.Context()
+
+			if svcApp, ok := svc.(*AppServices); ok && svcApp.Constituency != nil {
+				fc, err := svcApp.Constituency.ListAllAsFeatureCollection(ctx)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+					return
+				}
+				out, _ := json.Marshal(fc)
+				c.Data(http.StatusOK, "application/geo+json", out)
+				return
+			}
+
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "ListAllAsFeatureCollection not implemented for constituencies"})
 		})
 
 		// The County-by-slug, constituencies, wards and spatial intersect routes depend

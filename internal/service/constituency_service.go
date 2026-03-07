@@ -7,7 +7,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/paula-dot/kenya-admin-boundaries-api/internal/domain"
 	"github.com/paula-dot/kenya-admin-boundaries-api/internal/repository/postgres"
+	"github.com/paula-dot/kenya-admin-boundaries-api/pkg/geojson"
 )
 
 // ConstituencyListItem is the shape expected by handlers/router for constituency lists.
@@ -20,6 +22,7 @@ type ConstituencyListItem struct {
 
 // constituencyRepo defines the subset of repository methods used by the service.
 type constituencyRepo interface {
+	ListConstituencies(ctx context.Context) ([]*domain.Constituency, error)
 	ListConstituenciesByCounty(ctx context.Context, countyCode string) ([]postgres.ListConstituenciesByCountyRow, error)
 	ListConstituenciesMetadataByCounty(ctx context.Context, countyCode string) ([]postgres.ListConstituenciesMetadataByCountyRow, error)
 }
@@ -141,4 +144,54 @@ func (s *ConstituencyService) ListConstituenciesMetadataByCountySlug(ctx context
 	}
 
 	return meta, nil
+}
+
+// ListAllAsFeatureCollection returns all constituencies packaged as a GeoJSON FeatureCollection.
+func (s *ConstituencyService) ListAllAsFeatureCollection(ctx context.Context) (*geojson.FeatureCollection, error) {
+	cacheKey := "constituencies:all:fc"
+
+	// 1. Check Cache
+	if s.cache != nil {
+		cachedData, err := s.cache.Get(ctx, cacheKey)
+		if err == nil && cachedData != nil {
+			var fc geojson.FeatureCollection
+			if err := json.Unmarshal(cachedData, &fc); err == nil {
+				return &fc, nil
+			}
+		}
+	}
+
+	// 2. Cache Miss: Fetch from DB
+	constituencies, err := s.repo.ListConstituencies(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list constituencies: %w", err)
+	}
+
+	features := make([]geojson.Feature, 0, len(constituencies))
+	for _, c := range constituencies {
+		feature := geojson.Feature{
+			Type: "Feature",
+			ID:   fmt.Sprintf("%d", c.ID),
+			Properties: map[string]interface{}{
+				"code":      c.Slug,
+				"name":      c.Name,
+				"county_id": c.CountyID,
+			},
+			Geometry: json.RawMessage(c.GeoJSON),
+		}
+		features = append(features, feature)
+	}
+
+	collection := geojson.NewFeatureCollection(features)
+
+	// 3. Cache asynchronously
+	if s.cache != nil {
+		if collBytes, err := json.Marshal(collection); err == nil {
+			go func(ctx context.Context, key string, b []byte) {
+				_ = s.cache.Set(ctx, key, b, 24*time.Hour)
+			}(context.Background(), cacheKey, collBytes)
+		}
+	}
+
+	return collection, nil
 }
