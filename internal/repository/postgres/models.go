@@ -16,3 +16,10 @@ type County struct {
 	CountyName string      `json:"county_name"`
 	Geom       interface{} `json:"geom"`
 }
+
+type SubCounty struct {
+	CountyCode    string `json:"county_code"`
+	CountyName    string `json:"county_name"`
+	SubCountyCode string `json:"sub_county_code"`
+	SubCountyName string `json:"sub_county_name"`
+}

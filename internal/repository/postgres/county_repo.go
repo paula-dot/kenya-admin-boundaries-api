@@ -93,3 +93,8 @@ func (r *CountyRepo) ListCounties(ctx context.Context) ([]*domain.County, error)
 
 	return counties, nil
 }
+
+// GetCountyMetadata retrieves lightweight county metadata without geometries.
+func (r *CountyRepo) GetCountyMetadata(ctx context.Context, code string) (GetCountyMetadataRow, error) {
+	return r.db.GetCountyMetadata(ctx, code)
+}

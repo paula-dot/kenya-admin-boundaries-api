@@ -74,6 +74,43 @@ func (q *Queries) CreateCounty(ctx context.Context, arg CreateCountyParams) (Cre
 	return i, err
 }
 
+const getAllSubCounties = `-- name: GetAllSubCounties :many
+SELECT
+    county_code,
+    county_name,
+    sub_county_code,
+    sub_county_name
+FROM
+    sub_counties
+ORDER BY
+    county_code ASC, sub_county_code ASC
+`
+
+func (q *Queries) GetAllSubCounties(ctx context.Context) ([]SubCounty, error) {
+	rows, err := q.db.Query(ctx, getAllSubCounties)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SubCounty{}
+	for rows.Next() {
+		var i SubCounty
+		if err := rows.Scan(
+			&i.CountyCode,
+			&i.CountyName,
+			&i.SubCountyCode,
+			&i.SubCountyName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getConstituencyByCode = `-- name: GetConstituencyByCode :one
 SELECT
     constituency_code AS id,
@@ -129,6 +166,26 @@ func (q *Queries) GetCountyByCode(ctx context.Context, countyCode string) (GetCo
 	return i, err
 }
 
+const getCountyMetadata = `-- name: GetCountyMetadata :one
+SELECT county_code AS code, county_name AS name
+FROM counties
+WHERE county_code = $1
+LIMIT 1
+`
+
+type GetCountyMetadataRow struct {
+	Code string `json:"code"`
+	Name string `json:"name"`
+}
+
+// Retrieves just the code and name of a county without the geometry
+func (q *Queries) GetCountyMetadata(ctx context.Context, countyCode string) (GetCountyMetadataRow, error) {
+	row := q.db.QueryRow(ctx, getCountyMetadata, countyCode)
+	var i GetCountyMetadataRow
+	err := row.Scan(&i.Code, &i.Name)
+	return i, err
+}
+
 const getIntersectingBoundary = `-- name: GetIntersectingBoundary :one
 SELECT
     c.county_code,
@@ -166,6 +223,45 @@ func (q *Queries) GetIntersectingBoundary(ctx context.Context, arg GetIntersecti
 		&i.ConstituencyName,
 	)
 	return i, err
+}
+
+const getSubCountiesByCounty = `-- name: GetSubCountiesByCounty :many
+SELECT
+    sub_county_code,
+    sub_county_name,
+    county_name
+FROM
+    sub_counties
+WHERE
+    county_code = $1
+ORDER BY
+    sub_county_code ASC
+`
+
+type GetSubCountiesByCountyRow struct {
+	SubCountyCode string `json:"sub_county_code"`
+	SubCountyName string `json:"sub_county_name"`
+	CountyName    string `json:"county_name"`
+}
+
+func (q *Queries) GetSubCountiesByCounty(ctx context.Context, countyCode string) ([]GetSubCountiesByCountyRow, error) {
+	rows, err := q.db.Query(ctx, getSubCountiesByCounty, countyCode)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetSubCountiesByCountyRow{}
+	for rows.Next() {
+		var i GetSubCountiesByCountyRow
+		if err := rows.Scan(&i.SubCountyCode, &i.SubCountyName, &i.CountyName); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listConstituencies = `-- name: ListConstituencies :many
@@ -245,6 +341,39 @@ func (q *Queries) ListConstituenciesByCounty(ctx context.Context, countyCode str
 			&i.CountyCode,
 			&i.Geojson,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listConstituenciesMetadataByCounty = `-- name: ListConstituenciesMetadataByCounty :many
+SELECT constituency_code AS code, constituency_name AS name
+FROM constituencies
+WHERE county_code = $1
+ORDER BY constituency_code ASC
+`
+
+type ListConstituenciesMetadataByCountyRow struct {
+	Code string `json:"code"`
+	Name string `json:"name"`
+}
+
+// Retrieves lightweight list of constituencies (code and name) for a county
+func (q *Queries) ListConstituenciesMetadataByCounty(ctx context.Context, countyCode string) ([]ListConstituenciesMetadataByCountyRow, error) {
+	rows, err := q.db.Query(ctx, listConstituenciesMetadataByCounty, countyCode)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListConstituenciesMetadataByCountyRow{}
+	for rows.Next() {
+		var i ListConstituenciesMetadataByCountyRow
+		if err := rows.Scan(&i.Code, &i.Name); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

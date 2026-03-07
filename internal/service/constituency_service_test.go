@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/paula-dot/kenya-admin-boundaries-api/internal/domain"
 	"github.com/paula-dot/kenya-admin-boundaries-api/internal/repository/postgres"
 )
 
@@ -20,6 +21,14 @@ func (f *fakeRepo) ListConstituenciesByCounty(ctx context.Context, countyCode st
 		return nil, f.err
 	}
 	return f.rows, nil
+}
+
+func (f *fakeRepo) ListConstituencies(ctx context.Context) ([]*domain.Constituency, error) {
+	return nil, f.err
+}
+
+func (f *fakeRepo) ListConstituenciesMetadataByCounty(ctx context.Context, countyCode string) ([]postgres.ListConstituenciesMetadataByCountyRow, error) {
+	return nil, f.err
 }
 
 func TestListConstituenciesByCountySlug(t *testing.T) {
@@ -80,7 +89,7 @@ func TestListConstituenciesByCountySlug(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			repo := &fakeRepo{rows: tc.rows, err: tc.repoErr}
-			svc := NewConstituencyService(repo)
+			svc := NewConstituencyService(repo, nil)
 			got, err := svc.ListConstituenciesByCountySlug(context.Background(), "10")
 			if (err != nil) != tc.wantErr {
 				t.Fatalf("unexpected error state: got err=%v wantErr=%v", err, tc.wantErr)

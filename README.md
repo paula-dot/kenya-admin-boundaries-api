@@ -1,79 +1,83 @@
-#  Kenya Admin Boundaries API
+# Kenya Admin Boundaries API
 
-A production-grade geospatial API and visualization platform specifically mapping Kenya's administrative and electoral boundaries down to the ward level.
+A production-grade geospatial REST API mapping Kenya's administrative and electoral boundaries down to the constituency and sub-county level.
 
-This project provides high-performance spatial queries, caching, and a responsive web interface, built with a focus on Clean Architecture and scalable deployment.
+This project provides high-performance spatial queries, caching, and a clean JSON interface, built with a focus on Clean Architecture and scalable deployment.
 
-##  Tech Stack
+## Tech Stack
 
-* **Backend:** Golang (Clean Architecture)
-* **Database:** PostgreSQL with PostGIS extension
-* **Cache:** Redis
-* **Frontend:** React (TypeScript) with Leaflet.js
-* **ETL Pipeline:** Python (GeoPandas, SQLAlchemy)
+* **Backend:** Golang 1.25 (Clean Architecture)
+* **Web Framework:** Gin
+* **Database:** PostgreSQL 15 with PostGIS 3.3
+* **Cache:** Redis 7 
+* **Database Interactions:** `sqlc` for type-safe SQL, `golang-migrate` for schema definitions
 * **Infrastructure:** Docker & Docker Compose
 
-##  Project Structure
+## Repository Structure
 
-This repository is organized as a monorepo containing three main services:
+The Go REST API is designed using strict separation of concerns:
+* `cmd/api/main.go` - The entry point and dependency injection wiring.
+* `internal/domain` - Core business models (e.g., County, SubCounty, Constituency).
+* `internal/repository/postgres` - `sqlc`-generated database interactions.
+* `internal/service` - Business logic and caching interfaces.
+* `internal/handler` - HTTP delivery, request binding, and JSON responses.
+* `migrations/` - Raw SQL definitions for the PostGIS tables.
 
-* `/backend` - The Go REST API, implementing strict separation of concerns (Domain, Service, Repository, Handler).
-* `/frontend` - The React application for map visualization and boundary searching.
-* `/data-pipeline` - Python scripts for extracting `.gpkg` or `.shp` boundary data and loading it into PostGIS.
+## Getting Started
 
-##  Getting Started
+### Prerequisites
+* Docker & Docker Compose
 
-###  Prerequisites
+### Quick Start
 
-Ensure you have the following installed on your machine:
-* [Docker](https://docs.docker.com/get-docker/)
-* [Docker Compose](https://docs.docker.com/compose/install/)
-* Git
-
-###  Quick Start
-
-1.  **Clone the repository:**
+1.  **Start the infrastructure:**
     ```bash
-    git clone [https://github.com/your-org/kenya-county-constituency-ward-api.git](https://github.com/your-org/kenya-county-constituency-ward-api.git)
-    cd kenya-county-constituency-ward-api
+    docker compose up -d
     ```
+    This spins up the Go API (Port 18080), PostgreSQL/PostGIS (Port 5432), and Redis (Port 6379), using the overrides specified in `docker-compose.override.yml`.
 
-2.  **Start the infrastructure (Postgres/PostGIS, Redis, API, Frontend):**
-    ```bash
-    docker-compose up -d --build
-    ```
+2.  **Access the API:**
+    * Base URL: `http://127.0.0.1:18080/api/v1`
+    * Routes: `http://127.0.0.1:18080/__routes`
+    * Health check: `http://127.0.0.1:18080/health`
 
-3.  **Run Database Migrations:**
-    ```bash
-    docker-compose exec backend migrate -path ./migrations -database "$DATABASE_URL" up
-    ```
 
-4.  **Load Initial Boundary Data:**
-    Place your raw GeoPackage files in `data-pipeline/raw_data/` and run the ETL script:
-    ```bash
-    cd data-pipeline
-    python -m venv venv
-    source venv/bin/activate
-    pip install -r requirements.txt
-    python scripts/load_data.py
-    ```
+## Core API Endpoints
 
-5.  **Access the Application:**
-    * **Frontend UI:** `http://localhost:3000`
-    * **API Base URL:** `http://localhost:8080/api/v1`
-    * **API Documentation (Swagger):** `http://localhost:8080/swagger/index.html`
+### 1. Counties
+* **GET `/api/v1/counties`**
+  Returns a GeoJSON FeatureCollection of all 47 Kenyan counties.
+* **GET `/api/v1/counties/:code`**
+  Get a specific county boundary as a single GeoJSON Feature. (e.g., `KE047` for Nairobi).
 
-##  Core API Endpoints
+### 2. Constituencies
+* **GET `/api/v1/counties/:code/constituencies`**
+  Get all constituencies within a specific county, returned as a FeatureCollection.
 
-All spatial responses are returned as standard `GeoJSON FeatureCollection` objects.
+### 3. Sub-Counties
+* **GET `/api/v1/sub-counties`**
+  Returns a lightweight JSON array describing all administrative sub-counties.
+* **GET `/api/v1/counties/:code/sub-counties`**
+  Returns a lightweight JSON array of sub-counties within a specific county.
 
-* `GET /api/v1/counties` - List all counties.
-* `GET /api/v1/counties/:slug` - Get specific county boundaries.
-* `GET /api/v1/counties/:slug/constituencies` - Get constituencies within a specific county.
-* `POST /api/v1/spatial/intersect` - Submit a Point (Lat/Lng) to find exactly which Ward, Constituency, and County it falls inside.
+### 4. Hierarchical Metadata
+* **GET `/api/v1/counties/:code/hierarchy`**
+  A fast, lightweight endpoint returning the County code/name tightly coupled with an array of its Constituencies, completely omitting the multi-megabyte PostGIS geometries.
 
-##  Architecture & Best Practices
+### 5. Spatial Intersections
+* **POST `/api/v1/spatial/intersect`**
+  Submit a Lat/Lng coordinate pair to find exactly which administrative boundaries (County, Constituency, Ward) the point falls inside.
+  
+  *Example Payload:*
+  ```json
+  {
+      "latitude": -1.286389, 
+      "longitude": 36.817223
+  }
+  ```
 
+## Architecture Notes
 * **Clean Architecture:** The backend strictly isolates the domain logic from external frameworks, HTTP delivery, and database implementations.
-* **Spatial Indexing:** All boundary geometries use PostGIS `GIST` indexes for highly optimized spatial intersections.
+* **Spatial Indexing:** All boundary geometries use PostGIS `GIST` indexes for highly optimized sub-millisecond spatial ST_Intersects operations.
 * **Caching Strategy:** Expensive `ST_AsGeoJSON` database queries are cached in Redis to guarantee sub-millisecond response times for frequently requested boundaries.
+* **Service Interfaces:** Handlers depend on strictly defined Service interfaces, making unit-testing and mock generation simple.

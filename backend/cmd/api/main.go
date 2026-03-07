@@ -12,6 +12,7 @@ import (
 
 	"github.com/paula-dot/kenya-admin-boundaries-api/internal/config"
 	"github.com/paula-dot/kenya-admin-boundaries-api/internal/handler"
+	"github.com/paula-dot/kenya-admin-boundaries-api/internal/middleware"
 	"github.com/paula-dot/kenya-admin-boundaries-api/internal/repository"
 	"github.com/paula-dot/kenya-admin-boundaries-api/internal/repository/postgres"
 	redisRepo "github.com/paula-dot/kenya-admin-boundaries-api/internal/repository/redis"
@@ -19,6 +20,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 )
 
 // noopCache is used when Redis is not configured or fails to initialize in dev.
@@ -72,23 +74,53 @@ func main() {
 	}
 	log.Println("Successfully connected to database!")
 
+	// Create sqlc-generated Queries (used by SpatialService)
+	sqlcQueries := postgres.New(dbPool)
+
 	// 4. Dependency Injection Setup
 	pgRepo := postgres.NewCountyRepository(dbPool)
 	// create constituency repository and service so router can list constituencies
 	consRepo := postgres.NewConstituencyRepository(dbPool)
+	// create sub-county repository
+	subCountyRepo := postgres.NewSubCountyRepository(dbPool)
 
 	// Initialize redis cache if configured; otherwise fall back to noopCache
 	var cacheRepo service.CacheRepository
+	// Also create a redis.Client for the SpatialService. Parse cfg.RedisURL if present.
+	var rdb *redis.Client
 	if cfg.RedisURL == "" {
 		log.Println("REDIS_URL not set; using noop cache (development mode)")
 		cacheRepo = &noopCache{}
+		// create a local redis client pointing at localhost for best-effort caching in dev
+		rdb = redis.NewClient(&redis.Options{Addr: "localhost:6379", Password: "", DB: 0})
 	} else {
+		// Try to initialize both the repository wrapper and the raw redis client.
 		r, err := redisRepo.NewCacheRepository(cfg.RedisURL)
 		if err != nil {
-			log.Printf("Unable to initialize redis cache: %v; falling back to noop cache\n", err)
+			log.Printf("Unable to initialize redis cache repo: %v; falling back to noop cache\n", err)
 			cacheRepo = &noopCache{}
 		} else {
 			cacheRepo = r
+		}
+
+		// Parse cfg.RedisURL to extract host:port and optional password for go-redis
+		addr := cfg.RedisURL
+		password := ""
+		if u, err := url.Parse(cfg.RedisURL); err == nil && u.Host != "" {
+			addr = u.Host
+			if u.User != nil {
+				if p, ok := u.User.Password(); ok {
+					password = p
+				}
+			}
+		}
+		rdb = redis.NewClient(&redis.Options{Addr: addr, Password: password, DB: 0})
+	}
+
+	// Attempt a lightweight ping to Redis; don't fail startup if Redis is unreachable
+	if rdb != nil {
+		if err := rdb.Ping(ctx).Err(); err != nil {
+			log.Printf("Warning: Redis ping failed: %v (continuing without cache client)\n", err)
 		}
 	}
 
@@ -96,19 +128,20 @@ func main() {
 	spatialRepo := &repository.SpatialRepository{DB: dbPool}
 
 	countySvc := service.NewCountyService(pgRepo, cacheRepo, spatialRepo)
-	consSvc := service.NewConstituencyService(consRepo)
+	consSvc := service.NewConstituencyService(consRepo, cacheRepo)
+	spatialSvc := service.NewSpatialService(sqlcQueries, rdb)
+	subCountySvc := service.NewSubCountyService(subCountyRepo, cacheRepo)
 
-	// Compose a lightweight application service that satisfies multiple runtime
-	// assertions in the router. Router uses type assertions so embedding works well.
-	type appServices struct {
-		*service.CountyService
-		*service.ConstituencyService
+	// Use the handler.AppServices type so SetupRouter can register explicit handlers
+	svc := &handler.AppServices{
+		County:       countySvc,
+		Constituency: consSvc,
+		Spatial:      spatialSvc,
+		SubCounty:    subCountySvc,
 	}
 
-	svc := &appServices{CountyService: countySvc, ConstituencyService: consSvc}
-
-	// wire svc into handlers/router
-	router := handler.SetupRouter(svc)
+	// wire svc into handlers/router and apply rate limiter middleware to /api/v1
+	router := handler.SetupRouter(svc, middleware.RateLimiter(rdb, 60, time.Minute))
 
 	// Health endpoint (ensure SetupRouter sets other routes; this is a safe fallback)
 	router.GET("/health", func(c *gin.Context) {
@@ -162,5 +195,10 @@ func main() {
 	if err := srv.Shutdown(ctxShutdown); err != nil {
 		log.Fatalf("Server forced to shutdown: %v\n", err)
 	}
+
+	if rdb != nil {
+		rdb.Close()
+	}
+
 	log.Println("Server shut down successfully")
 }

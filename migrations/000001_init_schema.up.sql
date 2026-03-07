@@ -16,5 +16,20 @@ CREATE TABLE constituencies (
     county_code VARCHAR(50) NOT NULL REFERENCES counties(county_code) ON DELETE CASCADE,
     geom geometry(MultiPolygon, 4326)
 );
+
+-- Indexes
+-- CREATE INDEX counties_geom_idx ON public.counties USING GIST (geom);
 CREATE INDEX constituencies_geom_idx ON constituencies USING GIST (geom);
-CREATE INDEX constituencies_county_id_idx ON constituencies (county_id);
+CREATE INDEX constituencies_county_code_idx ON constituencies (county_code);
+
+CREATE TABLE sub_counties (
+    county_code VARCHAR(50) NOT NULL REFERENCES counties(county_code) ON DELETE CASCADE,
+    county_name VARCHAR(100) NOT NULL,
+    sub_county_code VARCHAR(50) NOT NULL,
+    sub_county_name VARCHAR(100) NOT NULL,
+    
+    -- This tells Postgres: "The code '1' can repeat, but 'KE001'+'1' must be unique"
+    PRIMARY KEY (county_code, sub_county_code)
+);
+
+CREATE INDEX sub_counties_county_code_idx ON sub_counties (county_code);

@@ -73,11 +73,6 @@ func GetLocationByPoint(db *pgxpool.Pool) gin.HandlerFunc {
 }
 
 // --- Handlers ---
-func listCounties(c *gin.Context) {
-	// Future: Fetch from DB and return as GeoJSON
-	c.JSON(http.StatusOK, gin.H{"message": "List all counties as GeoJSON FeatureCollection"})
-}
-
 func (h *APIHandler) GetCountyBySlug(c *gin.Context) {
 	slug := c.Param("slug")
 
@@ -91,16 +86,6 @@ func (h *APIHandler) GetCountyBySlug(c *gin.Context) {
 
 	// Return the perfectly formatted GeoJSON
 	c.JSON(http.StatusOK, feature)
-}
-
-func getConstituenciesByCounty(c *gin.Context) {
-	slug := c.Param("slug")
-	c.JSON(http.StatusOK, gin.H{"message": "Get constituencies for county: " + slug})
-}
-
-func getWardsByConstituency(c *gin.Context) {
-	slug := c.Param("slug") // e.g., "kapseret"
-	c.JSON(http.StatusOK, gin.H{"message": "Get wards for constituency: " + slug})
 }
 
 func (h *APIHandler) CheckIntersection(c *gin.Context) {

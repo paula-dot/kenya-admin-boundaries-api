@@ -103,3 +103,8 @@ func (r *ConstituencyRepo) ListConstituencies(ctx context.Context) ([]*domain.Co
 func (r *ConstituencyRepo) ListConstituenciesByCounty(ctx context.Context, countyCode string) ([]ListConstituenciesByCountyRow, error) {
 	return r.db.ListConstituenciesByCounty(ctx, countyCode)
 }
+
+// ListConstituenciesMetadataByCounty retrieves lightweight constituency metadata without geometries.
+func (r *ConstituencyRepo) ListConstituenciesMetadataByCounty(ctx context.Context, countyCode string) ([]ListConstituenciesMetadataByCountyRow, error) {
+	return r.db.ListConstituenciesMetadataByCounty(ctx, countyCode)
+}
