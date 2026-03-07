@@ -24,13 +24,10 @@ type AppServices struct {
 }
 
 // SetupRouter wires service into HTTP routes and returns a *gin.Engine.
-// Routes implemented (from README):
-// GET /api/v1/counties - list all counties (FeatureCollection)
-// GET /api/v1/counties/:slug - single county (FeatureCollection)
-// GET /api/v1/counties/:slug/constituencies - constituencies in a county (FeatureCollection)
-// GET /api/v1/constituencies/:slug/wards - wards in a constituency (FeatureCollection)
-// POST /api/v1/spatial/intersect - submit { "lat": <float>, "lng": <float> } and return matching ward/constituency/county (FeatureCollection)
-func SetupRouter(svc interface{}) *gin.Engine {
+// Accepts optional middleware functions that will be applied to the /api/v1
+// route group. This allows callers to attach rate-limiters or auth middleware
+// without modifying the internal router implementation.
+func SetupRouter(svc interface{}, v1Middleware ...gin.HandlerFunc) *gin.Engine {
 	r := gin.Default()
 
 	// Debug middleware: log raw request info to help diagnose unexpected path rewrites
@@ -49,7 +46,8 @@ func SetupRouter(svc interface{}) *gin.Engine {
 		c.Next()
 	})
 
-	v1 := r.Group("/api/v1")
+	// create the /api/v1 group and apply any provided middleware
+	v1 := r.Group("/api/v1", v1Middleware...)
 	{
 		// List all counties using the service method that returns a FeatureCollection
 		v1.GET("/counties", func(c *gin.Context) {

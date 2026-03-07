@@ -1,0 +1,118 @@
+openapi: 3.0.3
+info:
+  title: Spatial Intersection API
+  description:  A high-performance spatial API for querying geographic boundaries using PostGIS and Redis caching.
+  version: 1.0.0
+  contact:
+    name: API Support
+  servers:
+    - url: http://localhost:8080
+      description: Local development server
+paths:
+  /api/v1/spatial/intersect:
+    get:
+      summary: Find intersecting geographic boundaries
+      description: Returns a GeoJSON FeatureCollection of all spatial boundaries that intersect with the provided longitude and latitude. Results are cached for 24 hours.
+      tags:
+        - Spatial
+      parameters:
+        - name: lon
+          in: query
+          required: true
+          description: Longitude of the target point (e.g., 36.8219)
+          schema:
+            type: number
+            format: float
+          example: 36.821945
+        - name: lat
+          in: query
+          required: true
+          description: Latitude of the target point (e.g., -1.2921)
+          schema:
+            type: number
+            format: float
+          example: -1.292066
+      responses:
+        '200':
+          description: Successful spatial intersection query
+          headers:
+            X-RateLimit-Limit:
+              description: Maximum requests allowed per window
+              schema:
+                type: integer
+            X-RateLimit-Remaining:
+              description: Number of requests remaining in the current window
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeatureCollection'
+        '400':
+          description: Invalid parameters (e.g., missing or malformed coordinates)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Too Many Requests. Rate limit exceeded.
+          headers:
+            Retry-After:
+              description: Number of seconds to wait before retrying
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error (e.g., database connection failure)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    FeatureCollection:
+      type: object
+      required:
+        - type
+        - features
+      properties:
+        type:
+          type: string
+          enum: [FeatureCollection]
+        features:
+          type: array
+          items:
+            $ref: '#/components/schemas/Feature'
+      Feature:
+        type: object
+        required:
+          - type
+          - properties
+        properties:
+          type:
+            type: string
+            enum: [Feature]
+          geometry:
+            $ref: '#/components/schemas/Geometry'
+            nullable: true
+          properties:
+            type: object
+            description: Metadata about the matched boundary (e.g., name, admin codes)
+            additionalProperties: true
+      Geometry:
+        type: object
+        description: GeoJSON geometry object (may be null to save bandwidth)
+        nullable: true
+        additionalProperties: true
+      Error:
+        type: object
+        properties:
+          error:
+            type: string
+            description: Human-readable error message
+          retry_after:
+            type: number
+            description: Optional retry window in seconds (used for 429 responses)

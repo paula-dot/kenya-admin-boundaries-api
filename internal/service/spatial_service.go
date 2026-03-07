@@ -15,7 +15,7 @@ import (
 // SpatialService acts as the bridge between the Gin handler and the Postgres engine
 type SpatialService struct {
 	queries *db.Queries
-	redis   *redis.CLient
+	redis   *redis.Client
 }
 
 // NewSpatialService initializes the service with database access
@@ -59,4 +59,63 @@ func (s *SpatialService) GetIntersection(ctx context.Context, lat, lon float64) 
 		ConstituencyCode: row.ConstituencyCode,
 		ConstituencyName: row.ConstituencyName,
 	}, nil
+}
+
+// GetLocationByCoordinates checks the cache first, then falls back to PostGIS
+// and returns a generic FeatureCollection-like structure (interface{}) so handlers
+// can marshal as GeoJSON if needed.
+func (s *SpatialService) GetLocationByCoordinates(ctx context.Context, lon, lat float64) (interface{}, error) {
+	// 1. Generate Cache Key (Round to 4 decimal places for ~11m precision)
+	cacheKey := fmt.Sprintf("spatial:lookup:%.4f:%.4f", lon, lat)
+
+	// 2. Try to fetch from Redis Cache
+	cachedResult, err := s.redis.Get(ctx, cacheKey).Result()
+	if err == redis.Nil {
+		// CACHE MISS: Proceed to query PostGIS
+		params := db.GetIntersectingBoundaryParams{Longitude: lon, Latitude: lat}
+		row, err := s.queries.GetIntersectingBoundary(ctx, params)
+		if err != nil {
+			return nil, err
+		}
+
+		// Build a minimal FeatureCollection-like structure from the DB row
+		dbResult := map[string]interface{}{
+			"type": "FeatureCollection",
+			"features": []interface{}{
+				map[string]interface{}{
+					"county_code":       row.CountyCode,
+					"county_name":       row.CountyName,
+					"constituency_code": row.ConstituencyCode,
+					"constituency_name": row.ConstituencyName,
+				},
+			},
+		}
+
+		// Serialize the PostGIS result to JSON
+		resultJSON, marshalErr := json.Marshal(dbResult)
+		if marshalErr != nil {
+			return nil, fmt.Errorf("failed to marshal db result: %w", marshalErr)
+		}
+
+		// 3. Save to Redis with a 24-hour TTL (Time To Live)
+		err = s.redis.Set(ctx, cacheKey, resultJSON, 24*time.Hour).Err()
+		if err != nil {
+			// Log the error, but don't fail the request (cache writing shouldn't break the API)
+			fmt.Printf("Warning: Failed to set cache for %s: %v\n", cacheKey, err)
+		}
+
+		return dbResult, nil
+
+	} else if err != nil {
+		// Handle actual Redis connection errors
+		return nil, fmt.Errorf("redis error: %w", err)
+	}
+
+	// CACHE HIT: Unmarshal and return the cached data instantly
+	var hitResult interface{}
+	if err := json.Unmarshal([]byte(cachedResult), &hitResult); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal cached result: %w", err)
+	}
+
+	return hitResult, nil
 }
