@@ -7,15 +7,13 @@ import "./index.css";
 function App() {
   return (
     <Router>
-      <DocLayout>
-        <Routes>
-          <Route path="/" element={<Navigate to="/counties" replace />} />
-          <Route path="/counties" element={<ApiDocs />} />
-          <Route path="/constituencies" element={<ApiDocs />} />
-          <Route path="/spatial" element={<ApiDocs />} />
-          <Route path="/map" element={<Playground />} />
-        </Routes>
-      </DocLayout>
+      <Routes>
+        <Route path="/" element={<Navigate to="/counties" replace />} />
+        <Route path="/counties" element={<DocLayout><ApiDocs /></DocLayout>} />
+        <Route path="/constituencies" element={<DocLayout><ApiDocs /></DocLayout>} />
+        <Route path="/sub-counties" element={<DocLayout><ApiDocs /></DocLayout>} />
+        <Route path="/map" element={<DocLayout noPadding><Playground /></DocLayout>} />
+      </Routes>
     </Router>
   );
 }

@@ -15,7 +15,7 @@ interface EndpointProps {
 
 const Endpoint: React.FC<EndpointProps> = ({ method, path, description, responsePayload, parameters }) => {
   const methodColor = method === "GET" ? "text-blue-600 bg-blue-100" : "text-green-600 bg-green-100";
-  
+
   return (
     <div className="mb-16">
       <h3 className="text-xl font-semibold mb-2 flex items-center gap-3">
@@ -59,8 +59,8 @@ const Endpoint: React.FC<EndpointProps> = ({ method, path, description, response
       <div>
         <h4 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3">Example Response</h4>
         <div className="rounded-lg overflow-hidden border bg-[#f8f8f8] shadow-sm">
-          <SyntaxHighlighter 
-            language="json" 
+          <SyntaxHighlighter
+            language="json"
             style={docco}
             customStyle={{ margin: 0, padding: '1.5rem', fontSize: '0.875rem' }}
           >
@@ -72,21 +72,33 @@ const Endpoint: React.FC<EndpointProps> = ({ method, path, description, response
   );
 };
 
+import { Link } from "react-router-dom";
+import { Map as MapIcon } from "lucide-react";
+
 export default function ApiDocs() {
   return (
     <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <header className="border-b pb-8">
-        <h1 className="text-4xl font-extrabold tracking-tight mb-4">Kenya Admin Boundaries API</h1>
-        <p className="text-xl text-muted-foreground max-w-3xl leading-relaxed">
-          A production-grade geospatial REST API mapping Kenya's administrative and electoral boundaries 
-          down to the constituency and sub-county level. Designed for sub-millisecond spatial queries.
-        </p>
+      <header className="border-b pb-8 flex justify-between items-start">
+        <div>
+          <h1 className="text-4xl font-extrabold tracking-tight mb-4">Kenya Admin Boundaries API</h1>
+          <p className="text-xl text-muted-foreground max-w-3xl leading-relaxed">
+            A production-grade geospatial REST API mapping Kenya's administrative and electoral boundaries
+            down to the constituency and sub-county level. Designed for sub-millisecond spatial queries.
+          </p>
+        </div>
+        <Link
+          to="/map"
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground font-semibold rounded-md shadow hover:bg-primary/90 transition-colors"
+        >
+          <MapIcon className="w-5 h-5" />
+          Interactive Map
+        </Link>
       </header>
 
       <section>
         <h2 className="text-2xl font-bold border-b pb-2 mb-8">Counties</h2>
-        
-        <Endpoint 
+
+        <Endpoint
           method="GET"
           path="/api/v1/counties"
           description="Returns a GeoJSON FeatureCollection of all 47 Kenyan counties with their polygons and metadata."
@@ -109,7 +121,7 @@ export default function ApiDocs() {
 }`}
         />
 
-        <Endpoint 
+        <Endpoint
           method="GET"
           path="/api/v1/counties/:slug"
           description="Get a specific county boundary as a single GeoJSON Feature."
@@ -129,8 +141,8 @@ export default function ApiDocs() {
   }
 }`}
         />
-        
-        <Endpoint 
+
+        <Endpoint
           method="GET"
           path="/api/v1/counties/:slug/hierarchy"
           description="A fast, lightweight endpoint returning the County code and name tightly coupled with an array of its Constituencies, completely omitting the heavy PostGIS geometries."
@@ -156,7 +168,7 @@ export default function ApiDocs() {
 
       <section className="pt-8">
         <h2 className="text-2xl font-bold border-b pb-2 mb-8">Sub-Counties</h2>
-        <Endpoint 
+        <Endpoint
           method="GET"
           path="/api/v1/sub-counties"
           description="Returns a lightweight JSON array describing all administrative sub-counties."
@@ -171,7 +183,7 @@ export default function ApiDocs() {
   ]
 }`}
         />
-        <Endpoint 
+        <Endpoint
           method="GET"
           path="/api/v1/counties/:slug/sub-counties"
           description="Returns a lightweight JSON array of sub-counties within a specific county."
@@ -185,40 +197,6 @@ export default function ApiDocs() {
       "county_name": "Nairobi",
       "sub_county_code": "275",
       "sub_county_name": "Starehe"
-    }
-  ]
-}`}
-        />
-      </section>
-
-      <section className="pt-8">
-        <h2 className="text-2xl font-bold border-b pb-2 mb-8">Spatial Intersections</h2>
-        
-        <Endpoint 
-          method="POST"
-          path="/api/v1/spatial/intersect"
-          description="Submit a Lat/Lng coordinate pair to find exactly which administrative boundaries (County, Constituency) the point falls inside. Highly optimized using PostGIS GIST indexes."
-          parameters={[]}
-          responsePayload={`{
-  "type": "FeatureCollection",
-  "features": [
-    {
-      "type": "Feature",
-      "geometry": null,
-      "properties": {
-        "id": 275,
-        "name": "Starehe",
-        "type": "constituency"
-      }
-    },
-    {
-      "type": "Feature",
-      "geometry": { "type": "Polygon", "coordinates": [...] },
-      "properties": {
-        "id": 47,
-        "name": "Nairobi",
-        "type": "county"
-      }
     }
   ]
 }`}

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -254,163 +253,6 @@ func SetupRouter(svc interface{}, v1Middleware ...gin.HandlerFunc) *gin.Engine {
 			})
 		}
 
-		// GET /api/v1/constituencies/:slug/wards
-		v1.GET("/constituencies/:slug/wards", func(c *gin.Context) {
-			slug := c.Param("slug")
-			ctx := c.Request.Context()
-
-			type wardSvc interface {
-				ListWardsByConstituencySlug(ctx context.Context, slug string) ([]struct {
-					ID       int32
-					Slug     string
-					Name     string
-					Geometry []byte
-				}, error)
-			}
-
-			if s, ok := svc.(wardSvc); ok {
-				list, err := s.ListWardsByConstituencySlug(ctx, slug)
-				if err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-					return
-				}
-				fc := buildFeatureCollectionFromWards(list)
-				out, _ := json.Marshal(fc)
-				c.Data(http.StatusOK, "application/geo+json", out)
-				return
-			}
-
-			c.JSON(http.StatusNotImplemented, gin.H{"error": "ListWardsByConstituencySlug not implemented in service"})
-		})
-
-		// POST /api/v1/spatial/intersect
-		if svcApp, ok := svc.(*AppServices); ok && svcApp.Spatial != nil {
-			spatialHdlr := NewSpatialHandler(svcApp.Spatial)
-			v1.POST("/spatial/intersect", spatialHdlr.HandleIntersect)
-		} else {
-			// Fallback: runtime assertion for test flexibility
-			v1.POST("/spatial/intersect", func(c *gin.Context) {
-				var payload struct {
-					Lat float64 `json:"lat"`
-					Lng float64 `json:"lng"`
-				}
-				if err := c.ShouldBindJSON(&payload); err != nil {
-					c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload"})
-					return
-				}
-				ctx := c.Request.Context()
-
-				type spatialSvc interface {
-					SpatialIntersect(ctx context.Context, lat, lng float64) (service.SpatialResult, error)
-				}
-
-				if s, ok := svc.(spatialSvc); ok {
-					res, err := s.SpatialIntersect(ctx, payload.Lat, payload.Lng)
-					if err != nil {
-						c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-						return
-					}
-
-					// Build a FeatureCollection containing up to Ward, Constituency, County in that order
-					var features []interface{}
-					if res.Ward != nil {
-						// domain.Ward exposes GeoJSON as a string field; convert to []byte for the helper
-						features = append(features, buildFeature([]byte(res.Ward.GeoJSON), map[string]interface{}{
-							"type": "ward",
-							"id":   res.Ward.ID,
-							"name": res.Ward.Name,
-						}))
-					}
-					if res.Constituency != nil {
-						features = append(features, buildFeature([]byte(res.Constituency.GeoJSON), map[string]interface{}{
-							"type": "constituency",
-							"id":   res.Constituency.ID,
-							"name": res.Constituency.Name,
-						}))
-					}
-					if res.County != nil {
-						features = append(features, buildFeature(res.County.Geometry, map[string]interface{}{
-							"type": "county",
-							"id":   res.County.ID,
-							"name": res.County.Name,
-						}))
-					}
-
-					fc := map[string]interface{}{
-						"type":     "FeatureCollection",
-						"features": features,
-					}
-
-					out, _ := json.Marshal(fc)
-					c.Data(http.StatusOK, "application/geo+json", out)
-					return
-				}
-
-				c.JSON(http.StatusNotImplemented, gin.H{"error": "SpatialIntersect not implemented in service"})
-			})
-		}
-
-		// GET /api/v1/location (query params lat,lng) - runtime assertion against spatialSvc
-		v1.GET("/location", func(c *gin.Context) {
-			latStr := c.Query("lat")
-			lngStr := c.Query("lng")
-			if latStr == "" || lngStr == "" {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "lat and lng query parameters are required"})
-				return
-			}
-			lat, err1 := strconv.ParseFloat(latStr, 64)
-			lng, err2 := strconv.ParseFloat(lngStr, 64)
-			if err1 != nil || err2 != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "lat and lng must be valid floats"})
-				return
-			}
-			ctx := c.Request.Context()
-
-			type spatialSvc interface {
-				SpatialIntersect(ctx context.Context, lat, lng float64) (service.SpatialResult, error)
-			}
-
-			if s, ok := svc.(spatialSvc); ok {
-				res, err := s.SpatialIntersect(ctx, lat, lng)
-				if err != nil {
-					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-					return
-				}
-
-				var features []interface{}
-				if res.Ward != nil {
-					features = append(features, buildFeature([]byte(res.Ward.GeoJSON), map[string]interface{}{
-						"type": "ward",
-						"id":   res.Ward.ID,
-						"name": res.Ward.Name,
-					}))
-				}
-				if res.Constituency != nil {
-					features = append(features, buildFeature([]byte(res.Constituency.GeoJSON), map[string]interface{}{
-						"type": "constituency",
-						"id":   res.Constituency.ID,
-						"name": res.Constituency.Name,
-					}))
-				}
-				if res.County != nil {
-					features = append(features, buildFeature(res.County.Geometry, map[string]interface{}{
-						"type": "county",
-						"id":   res.County.ID,
-						"name": res.County.Name,
-					}))
-				}
-
-				fc := map[string]interface{}{
-					"type":     "FeatureCollection",
-					"features": features,
-				}
-				out, _ := json.Marshal(fc)
-				c.Data(http.StatusOK, "application/geo+json", out)
-				return
-			}
-
-			c.JSON(http.StatusNotImplemented, gin.H{"error": "SpatialIntersect not implemented in service"})
-		})
 	}
 
 	return r
@@ -434,27 +276,6 @@ func buildFeatureCollectionFromCounties(counties []*domain.County) map[string]in
 }
 
 func buildFeatureCollectionFromConstituencies(list []struct {
-	ID       int32
-	Slug     string
-	Name     string
-	Geometry []byte
-}) map[string]interface{} {
-	features := make([]interface{}, 0, len(list))
-	for _, it := range list {
-		props := map[string]interface{}{
-			"id":   it.ID,
-			"slug": it.Slug,
-			"name": it.Name,
-		}
-		features = append(features, buildFeature(it.Geometry, props))
-	}
-	return map[string]interface{}{
-		"type":     "FeatureCollection",
-		"features": features,
-	}
-}
-
-func buildFeatureCollectionFromWards(list []struct {
 	ID       int32
 	Slug     string
 	Name     string

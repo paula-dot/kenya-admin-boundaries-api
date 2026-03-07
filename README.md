@@ -64,17 +64,6 @@ The Go REST API is designed using strict separation of concerns:
 * **GET `/api/v1/counties/:code/hierarchy`**
   A fast, lightweight endpoint returning the County code/name tightly coupled with an array of its Constituencies, completely omitting the multi-megabyte PostGIS geometries.
 
-### 5. Spatial Intersections
-* **POST `/api/v1/spatial/intersect`**
-  Submit a Lat/Lng coordinate pair to find exactly which administrative boundaries (County, Constituency, Ward) the point falls inside.
-  
-  *Example Payload:*
-  ```json
-  {
-      "latitude": -1.286389, 
-      "longitude": 36.817223
-  }
-  ```
 
 ## Architecture Notes
 * **Clean Architecture:** The backend strictly isolates the domain logic from external frameworks, HTTP delivery, and database implementations.
