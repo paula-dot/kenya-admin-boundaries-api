@@ -41,7 +41,21 @@ func (s *SpatialService) GetIntersection(ctx context.Context, lat, lon float64) 
 		return nil, errors.New("invalid coordinates: latitude must be between -90 and 90, and longitude between -180 and 180")
 	}
 
-	// PostGIS uses (Longitude, Latitude) for points (ST_MakePoint)
+	// 1. Generate Cache Key (Round to 4 decimal places for ~11m precision)
+	cacheKey := fmt.Sprintf("spatial:intersect:lat=%.4f:lon=%.4f", lat, lon)
+
+	// 2. Try Cache
+	if s.redis != nil {
+		cachedResult, err := s.redis.Get(ctx, cacheKey).Bytes()
+		if err == nil && cachedResult != nil {
+			var cachedResp IntersectResponse
+			if err := json.Unmarshal(cachedResult, &cachedResp); err == nil {
+				return &cachedResp, nil
+			}
+		}
+	}
+
+	// 3. PostGIS Query
 	params := db.GetIntersectingBoundaryParams{
 		Longitude: lon,
 		Latitude:  lat,
@@ -53,12 +67,23 @@ func (s *SpatialService) GetIntersection(ctx context.Context, lat, lon float64) 
 		return nil, err
 	}
 
-	return &IntersectResponse{
+	resp := &IntersectResponse{
 		CountyCode:       row.CountyCode,
 		CountyName:       row.CountyName,
 		ConstituencyCode: row.ConstituencyCode,
 		ConstituencyName: row.ConstituencyName,
-	}, nil
+	}
+
+	// 4. Save to Cache
+	if s.redis != nil {
+		if outBytes, err := json.Marshal(resp); err == nil {
+			go func(ctx context.Context, key string, b []byte) {
+				_ = s.redis.Set(ctx, key, b, 24*time.Hour).Err()
+			}(context.Background(), cacheKey, outBytes) // Using Background context so async save survives request death
+		}
+	}
+
+	return resp, nil
 }
 
 // GetLocationByCoordinates checks the cache first, then falls back to PostGIS

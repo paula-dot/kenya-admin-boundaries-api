@@ -86,7 +86,7 @@ func (s *CountyService) GetCountyAsFeature(ctx context.Context, code string) (*g
 	if featureBytes, err := json.Marshal(feature); err == nil {
 		go func(ctx context.Context, key string, b []byte) {
 			_ = s.cache.Set(ctx, key, b, 24*time.Hour)
-		}(ctx, cacheKey, featureBytes)
+		}(context.Background(), cacheKey, featureBytes)
 	}
 
 	return feature, nil
@@ -147,11 +147,47 @@ func (s *CountyService) GetCountyBySlug(ctx context.Context, slug string) (*doma
 
 // GetCountyMetadata provides lightweight code + name for a county.
 func (s *CountyService) GetCountyMetadata(ctx context.Context, code string) (postgres.GetCountyMetadataRow, error) {
-	return s.repo.GetCountyMetadata(ctx, code)
+	cacheKey := fmt.Sprintf("county:meta:%s", code)
+
+	// 1. Check cache
+	cachedData, err := s.cache.Get(ctx, cacheKey)
+	if err == nil && cachedData != nil {
+		var meta postgres.GetCountyMetadataRow
+		if err := json.Unmarshal(cachedData, &meta); err == nil {
+			return meta, nil
+		}
+	}
+
+	// 2. Cache miss: fetch from PostgreSQL
+	meta, err := s.repo.GetCountyMetadata(ctx, code)
+	if err != nil {
+		return meta, err
+	}
+
+	// 3. Populate cache asynchronously
+	if metaBytes, err := json.Marshal(meta); err == nil {
+		go func(ctx context.Context, key string, b []byte) {
+			_ = s.cache.Set(ctx, key, b, 24*time.Hour)
+		}(context.Background(), cacheKey, metaBytes)
+	}
+
+	return meta, nil
 }
 
 // ListCountiesAsFeatureCollection fetches all counties and packages them for Leaflet.js.
 func (s *CountyService) ListCountiesAsFeatureCollection(ctx context.Context) (*geojson.FeatureCollection, error) {
+	cacheKey := "counties:all"
+
+	// 1. Check Cache
+	cachedData, err := s.cache.Get(ctx, cacheKey)
+	if err == nil && cachedData != nil {
+		var collection geojson.FeatureCollection
+		if err := json.Unmarshal(cachedData, &collection); err == nil {
+			return &collection, nil
+		}
+	}
+
+	// 2. Cache Miss: Fetch from DB
 	counties, err := s.repo.ListCounties(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list counties: %w", err)
@@ -172,6 +208,14 @@ func (s *CountyService) ListCountiesAsFeatureCollection(ctx context.Context) (*g
 	}
 
 	collection := geojson.NewFeatureCollection(features)
+
+	// 3. Populate cache asynchronously
+	if collBytes, err := json.Marshal(collection); err == nil {
+		go func(ctx context.Context, key string, b []byte) {
+			_ = s.cache.Set(ctx, key, b, 24*time.Hour)
+		}(context.Background(), cacheKey, collBytes)
+	}
+
 	return collection, nil
 }
 

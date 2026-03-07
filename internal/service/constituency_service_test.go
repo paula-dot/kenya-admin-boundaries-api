@@ -84,7 +84,7 @@ func TestListConstituenciesByCountySlug(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			repo := &fakeRepo{rows: tc.rows, err: tc.repoErr}
-			svc := NewConstituencyService(repo)
+			svc := NewConstituencyService(repo, nil)
 			got, err := svc.ListConstituenciesByCountySlug(context.Background(), "10")
 			if (err != nil) != tc.wantErr {
 				t.Fatalf("unexpected error state: got err=%v wantErr=%v", err, tc.wantErr)

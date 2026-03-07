@@ -128,9 +128,9 @@ func main() {
 	spatialRepo := &repository.SpatialRepository{DB: dbPool}
 
 	countySvc := service.NewCountyService(pgRepo, cacheRepo, spatialRepo)
-	consSvc := service.NewConstituencyService(consRepo)
+	consSvc := service.NewConstituencyService(consRepo, cacheRepo)
 	spatialSvc := service.NewSpatialService(sqlcQueries, rdb)
-	subCountySvc := service.NewSubCountyService(subCountyRepo)
+	subCountySvc := service.NewSubCountyService(subCountyRepo, cacheRepo)
 
 	// Use the handler.AppServices type so SetupRouter can register explicit handlers
 	svc := &handler.AppServices{
