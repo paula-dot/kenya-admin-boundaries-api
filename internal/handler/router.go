@@ -21,6 +21,7 @@ type AppServices struct {
 	County       *service.CountyService
 	Constituency *service.ConstituencyService
 	Spatial      *service.SpatialService
+	SubCounty    *service.SubCountyService
 }
 
 // SetupRouter wires service into HTTP routes and returns a *gin.Engine.
@@ -195,6 +196,21 @@ func SetupRouter(svc interface{}, v1Middleware ...gin.HandlerFunc) *gin.Engine {
 				}
 
 				c.JSON(http.StatusNotImplemented, gin.H{"error": "ListConstituenciesByCountySlug not implemented in service"})
+			})
+		}
+
+		// Wire up sub-counties if available
+		if svcApp, ok := svc.(*AppServices); ok && svcApp.SubCounty != nil {
+			subCountyHdlr := NewSubCountyHandler(svcApp.SubCounty)
+			v1.GET("/sub-counties", subCountyHdlr.ListAll)
+			v1.GET("/counties/:slug/sub-counties", subCountyHdlr.ListByCounty)
+		} else {
+			// fallback explicitly returning 501 for sub-counties
+			v1.GET("/sub-counties", func(c *gin.Context) {
+				c.JSON(http.StatusNotImplemented, gin.H{"error": "ListAll SubCounties not implemented"})
+			})
+			v1.GET("/counties/:slug/sub-counties", func(c *gin.Context) {
+				c.JSON(http.StatusNotImplemented, gin.H{"error": "ListByCounty SubCounties not implemented"})
 			})
 		}
 

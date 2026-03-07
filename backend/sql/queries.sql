@@ -97,3 +97,26 @@ SELECT constituency_code AS code, constituency_name AS name
 FROM constituencies
 WHERE county_code = $1
 ORDER BY constituency_code ASC;
+
+-- name: GetAllSubCounties :many
+SELECT
+    county_code,
+    county_name,
+    sub_county_code,
+    sub_county_name
+FROM
+    sub_counties
+ORDER BY
+    county_code ASC, sub_county_code ASC;
+
+-- name: GetSubCountiesByCounty :many
+SELECT
+    sub_county_code,
+    sub_county_name,
+    county_name
+FROM
+    sub_counties
+WHERE
+    county_code = $1
+ORDER BY
+    sub_county_code ASC;

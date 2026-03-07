@@ -81,6 +81,8 @@ func main() {
 	pgRepo := postgres.NewCountyRepository(dbPool)
 	// create constituency repository and service so router can list constituencies
 	consRepo := postgres.NewConstituencyRepository(dbPool)
+	// create sub-county repository
+	subCountyRepo := postgres.NewSubCountyRepository(dbPool)
 
 	// Initialize redis cache if configured; otherwise fall back to noopCache
 	var cacheRepo service.CacheRepository
@@ -128,12 +130,14 @@ func main() {
 	countySvc := service.NewCountyService(pgRepo, cacheRepo, spatialRepo)
 	consSvc := service.NewConstituencyService(consRepo)
 	spatialSvc := service.NewSpatialService(sqlcQueries, rdb)
+	subCountySvc := service.NewSubCountyService(subCountyRepo)
 
 	// Use the handler.AppServices type so SetupRouter can register explicit handlers
 	svc := &handler.AppServices{
 		County:       countySvc,
 		Constituency: consSvc,
 		Spatial:      spatialSvc,
+		SubCounty:    subCountySvc,
 	}
 
 	// wire svc into handlers/router and apply rate limiter middleware to /api/v1

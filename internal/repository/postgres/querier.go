@@ -13,6 +13,7 @@ type Querier interface {
 	CreateConstituency(ctx context.Context, arg CreateConstituencyParams) (CreateConstituencyRow, error)
 	// Inserts a new county and converts the incoming GeoJSON payload into a PostGIS geometry.
 	CreateCounty(ctx context.Context, arg CreateCountyParams) (CreateCountyRow, error)
+	GetAllSubCounties(ctx context.Context) ([]SubCounty, error)
 	// Fetches a specific constituency by its official code.
 	GetConstituencyByCode(ctx context.Context, constituencyCode string) (GetConstituencyByCodeRow, error)
 	// Fetches a specific county by its official code and automatically formats the geometry as valid GeoJSON.
@@ -20,6 +21,7 @@ type Querier interface {
 	// Retrieves just the code and name of a county without the geometry
 	GetCountyMetadata(ctx context.Context, countyCode string) (GetCountyMetadataRow, error)
 	GetIntersectingBoundary(ctx context.Context, arg GetIntersectingBoundaryParams) (GetIntersectingBoundaryRow, error)
+	GetSubCountiesByCounty(ctx context.Context, countyCode string) ([]GetSubCountiesByCountyRow, error)
 	// Retrieves a list of all constituencies.
 	ListConstituencies(ctx context.Context) ([]ListConstituenciesRow, error)
 	// Retrieves all constituencies belonging to a specific county (Perfect for your nested route!)
