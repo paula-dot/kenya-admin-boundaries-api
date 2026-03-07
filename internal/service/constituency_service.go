@@ -18,6 +18,7 @@ type ConstituencyListItem struct {
 // constituencyRepo defines the subset of repository methods used by the service.
 type constituencyRepo interface {
 	ListConstituenciesByCounty(ctx context.Context, countyCode string) ([]postgres.ListConstituenciesByCountyRow, error)
+	ListConstituenciesMetadataByCounty(ctx context.Context, countyCode string) ([]postgres.ListConstituenciesMetadataByCountyRow, error)
 }
 
 // ConstituencyService provides helper methods around constituencies.
@@ -71,4 +72,9 @@ func (s *ConstituencyService) ListConstituenciesByCountySlug(ctx context.Context
 	}
 
 	return out, nil
+}
+
+// ListConstituenciesMetadataByCountySlug returns lightweight constituencies (code and name) for a given county slug.
+func (s *ConstituencyService) ListConstituenciesMetadataByCountySlug(ctx context.Context, slug string) ([]postgres.ListConstituenciesMetadataByCountyRow, error) {
+	return s.repo.ListConstituenciesMetadataByCounty(ctx, slug)
 }

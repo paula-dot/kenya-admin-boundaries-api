@@ -8,6 +8,7 @@ import (
 
 	"github.com/paula-dot/kenya-admin-boundaries-api/internal/domain"
 	"github.com/paula-dot/kenya-admin-boundaries-api/internal/repository"
+	"github.com/paula-dot/kenya-admin-boundaries-api/internal/repository/postgres"
 	"github.com/paula-dot/kenya-admin-boundaries-api/pkg/geojson"
 )
 
@@ -16,6 +17,7 @@ import (
 type CountyRepository interface {
 	GetCountyByCode(ctx context.Context, code string) (*domain.County, error)
 	ListCounties(ctx context.Context) ([]*domain.County, error)
+	GetCountyMetadata(ctx context.Context, code string) (postgres.GetCountyMetadataRow, error)
 }
 
 type CacheRepository interface {
@@ -141,6 +143,11 @@ func (s *CountyService) GetCountyBySlug(ctx context.Context, slug string) (*doma
 
 	// Fallback: attempt to treat the slug as an official code
 	return s.repo.GetCountyByCode(ctx, slug)
+}
+
+// GetCountyMetadata provides lightweight code + name for a county.
+func (s *CountyService) GetCountyMetadata(ctx context.Context, code string) (postgres.GetCountyMetadataRow, error) {
+	return s.repo.GetCountyMetadata(ctx, code)
 }
 
 // ListCountiesAsFeatureCollection fetches all counties and packages them for Leaflet.js.

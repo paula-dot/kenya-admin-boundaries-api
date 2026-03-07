@@ -115,6 +115,53 @@ func SetupRouter(svc interface{}, v1Middleware ...gin.HandlerFunc) *gin.Engine {
 			c.JSON(http.StatusNotImplemented, gin.H{"error": "GetCountyBySlug not implemented in service"})
 		})
 
+		// GET /api/v1/counties/:slug/hierarchy
+		// Returns lightweight metadata combining county info and constituency list
+		v1.GET("/counties/:slug/hierarchy", func(c *gin.Context) {
+			slug := c.Param("slug")
+			ctx := c.Request.Context()
+
+			if svcApp, ok := svc.(*AppServices); ok && svcApp.County != nil && svcApp.Constituency != nil {
+				countyMeta, err := svcApp.County.GetCountyMetadata(ctx, slug)
+				if err != nil {
+					c.JSON(http.StatusNotFound, gin.H{"error": "county not found"})
+					return
+				}
+
+				constMeta, err := svcApp.Constituency.ListConstituenciesMetadataByCountySlug(ctx, slug)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to retrieve constituencies"})
+					return
+				}
+
+				type constInfo struct {
+					Code string `json:"code"`
+					Name string `json:"name"`
+				}
+
+				var constituencies []constInfo
+				for _, cm := range constMeta {
+					constituencies = append(constituencies, constInfo{
+						Code: cm.Code,
+						Name: cm.Name,
+					})
+				}
+
+				if constituencies == nil {
+					constituencies = []constInfo{}
+				}
+
+				c.JSON(http.StatusOK, gin.H{
+					"county_code":    countyMeta.Code,
+					"county_name":    countyMeta.Name,
+					"constituencies": constituencies,
+				})
+				return
+			}
+			
+			c.JSON(http.StatusNotImplemented, gin.H{"error": "Hierarchical metadata not implemented"})
+		})
+
 		// Register constituencies by county route. Prefer explicit handler wiring
 		// when caller passed an *AppServices. Fall back to the existing runtime
 		// assertion behaviour for test flexibility.

@@ -83,3 +83,17 @@ WHERE ST_Intersects(
       ST_SetSRID(ST_MakePoint(@longitude::float, @latitude::float), 4326)
       )
 LIMIT 1;
+
+-- name: GetCountyMetadata :one
+-- Retrieves just the code and name of a county without the geometry
+SELECT county_code AS code, county_name AS name
+FROM counties
+WHERE county_code = $1
+LIMIT 1;
+
+-- name: ListConstituenciesMetadataByCounty :many
+-- Retrieves lightweight list of constituencies (code and name) for a county
+SELECT constituency_code AS code, constituency_name AS name
+FROM constituencies
+WHERE county_code = $1
+ORDER BY constituency_code ASC;

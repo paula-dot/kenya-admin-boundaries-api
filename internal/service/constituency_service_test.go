@@ -22,6 +22,10 @@ func (f *fakeRepo) ListConstituenciesByCounty(ctx context.Context, countyCode st
 	return f.rows, nil
 }
 
+func (f *fakeRepo) ListConstituenciesMetadataByCounty(ctx context.Context, countyCode string) ([]postgres.ListConstituenciesMetadataByCountyRow, error) {
+	return nil, f.err
+}
+
 func TestListConstituenciesByCountySlug(t *testing.T) {
 	tests := []struct {
 		name    string
