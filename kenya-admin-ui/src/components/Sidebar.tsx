@@ -7,7 +7,6 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 
 const API_BASE = "http://localhost:18080/api/v1";
@@ -95,7 +94,7 @@ export default function Sidebar({ onCountySelect }: SidebarProps) {
       <Separator />
 
       {/* County List */}
-      <ScrollArea className="flex-1">
+      <div className="flex-1 overflow-y-auto">
         <Accordion className="px-2">
           {counties.map((county) => (
             <AccordionItem
@@ -162,7 +161,7 @@ export default function Sidebar({ onCountySelect }: SidebarProps) {
             </AccordionItem>
           ))}
         </Accordion>
-      </ScrollArea>
+      </div>
     </div>
   );
 }
