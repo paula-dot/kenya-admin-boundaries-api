@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 
 	"github.com/paula-dot/kenya-admin-boundaries-api/internal/domain"
@@ -34,6 +35,15 @@ func SetupRouter(svc interface{}, v1Middleware ...gin.HandlerFunc) *gin.Engine {
 	// Debug middleware: log raw request info to help diagnose unexpected path rewrites
 	// (kept minimal and only enabled in development). It logs RequestURI, URL.Path
 	// and a few proxy headers which often cause path-prefixing issues.
+
+	r.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:5173", "http://localhost:3000"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+	}))
+
 	r.Use(func(c *gin.Context) {
 		log.Printf("[REQ] Method=%s RequestURI=%s URL.Path=%s Host=%s Referer=%s X-Forwarded-Host=%s X-Forwarded-Proto=%s\n",
 			c.Request.Method,
@@ -159,7 +169,7 @@ func SetupRouter(svc interface{}, v1Middleware ...gin.HandlerFunc) *gin.Engine {
 				})
 				return
 			}
-			
+
 			c.JSON(http.StatusNotImplemented, gin.H{"error": "Hierarchical metadata not implemented"})
 		})
 
