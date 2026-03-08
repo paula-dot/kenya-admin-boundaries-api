@@ -42,28 +42,70 @@ The Go REST API is designed using strict separation of concerns:
     * Health check: `http://127.0.0.1:18080/health`
 
 
-## Core API Endpoints
+## Comprehensive API Documentation
 
 ### 1. Counties
-* **GET `/api/v1/counties`**
-  Returns a GeoJSON FeatureCollection of all 47 Kenyan counties.
-* **GET `/api/v1/counties/:code`**
-  Get a specific county boundary as a single GeoJSON Feature. (e.g., `KE047` for Nairobi).
+
+**`GET /api/v1/counties`**
+- **Description:** Returns a GeoJSON FeatureCollection of all 47 Kenyan counties with their polygons and metadata.
+
+**`GET /api/v1/counties/:slug`**
+- **Description:** Get a specific county boundary as a single GeoJSON Feature.
+- **Parameters:**
+  - `slug` (string): The county code (e.g., `KE047` for Nairobi).
+
+**`GET /api/v1/counties/:slug/hierarchy`**
+- **Description:** A fast, lightweight endpoint returning the County code and name tightly coupled with an array of its Constituencies, completely omitting the heavy PostGIS geometries.
+- **Parameters:**
+  - `slug` (string): The county code (e.g., `KE001`).
+
+---
 
 ### 2. Constituencies
-* **GET `/api/v1/counties/:code/constituencies`**
-  Get all constituencies within a specific county, returned as a FeatureCollection.
+
+**`GET /api/v1/constituencies`**
+- **Description:** Returns a GeoJSON FeatureCollection of all electoral constituencies in Kenya.
+
+**`GET /api/v1/counties/:slug/constituencies`**
+- **Description:** Get all constituencies within a specific county, returned as a FeatureCollection.
+- **Parameters:**
+  - `slug` (string): The county code (e.g., `KE047` for Nairobi).
+
+---
 
 ### 3. Sub-Counties
-* **GET `/api/v1/sub-counties`**
-  Returns a lightweight JSON array describing all administrative sub-counties.
-* **GET `/api/v1/counties/:code/sub-counties`**
-  Returns a lightweight JSON array of sub-counties within a specific county.
 
-### 4. Hierarchical Metadata
-* **GET `/api/v1/counties/:code/hierarchy`**
-  A fast, lightweight endpoint returning the County code/name tightly coupled with an array of its Constituencies, completely omitting the multi-megabyte PostGIS geometries.
+**`GET /api/v1/sub-counties`**
+- **Description:** Returns a lightweight JSON array describing all administrative sub-counties.
 
+**`GET /api/v1/counties/:slug/sub-counties`**
+- **Description:** Returns a lightweight JSON array of sub-counties within a specific county.
+- **Parameters:**
+  - `slug` (string): The county code (e.g., `KE047` for Nairobi).
+
+---
+
+### 4. Wards
+
+**`GET /api/v1/wards`**
+- **Description:** Returns a paginated JSON list of all political wards across Kenya, including their parent constituency and county metadata.
+- **Parameters:**
+  - `page` (number): The page number (default 1).
+  - `limit` (number): The number of results per page (default 50).
+
+---
+
+## Interactive Map Playground
+
+While a custom frontend application isn't necessary for an API (and industry standard heavily favors generating docs directly or putting them in the `README`), this project includes a helpful interactive geospatial playground to instantly visualize the PostGIS spatial data on an actual map.
+
+To run the playground:
+```bash
+cd kenya-admin-ui
+npm install
+npm run dev
+```
+Navigate to `http://localhost:5173/map` to browse and interact with the polygon bounds.
 
 ## Architecture Notes
 * **Clean Architecture:** The backend strictly isolates the domain logic from external frameworks, HTTP delivery, and database implementations.
