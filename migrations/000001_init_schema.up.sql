@@ -33,3 +33,13 @@ CREATE TABLE sub_counties (
 );
 
 CREATE INDEX sub_counties_county_code_idx ON sub_counties (county_code);
+
+-- Wards (without geometry)
+CREATE TABLE wards (
+    county_code INTEGER NOT NULL,
+    county_name VARCHAR(255) NOT NULL,
+    constituency_code INTEGER NOT NULL,
+    constituency_name VARCHAR(255) NOT NULL,
+    ward_code INTEGER PRIMARY KEY,
+    ward_name VARCHAR(255) NOT NULL
+);

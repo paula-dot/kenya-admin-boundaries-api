@@ -30,6 +30,7 @@ type Querier interface {
 	ListConstituenciesMetadataByCounty(ctx context.Context, countyCode string) ([]ListConstituenciesMetadataByCountyRow, error)
 	// Retrieves a list of all counties. Uses code/name and numeric ordering.
 	ListCounties(ctx context.Context) ([]ListCountiesRow, error)
+	ListWards(ctx context.Context, arg ListWardsParams) ([]ListWardsRow, error)
 }
 
 var _ Querier = (*Queries)(nil)

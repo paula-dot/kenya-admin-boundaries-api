@@ -167,6 +167,59 @@ export default function ApiDocs() {
       </section>
 
       <section className="pt-8">
+        <h2 className="text-2xl font-bold border-b pb-2 mb-8">Constituencies</h2>
+        
+        <Endpoint 
+          method="GET"
+          path="/api/v1/constituencies"
+          description="Returns a GeoJSON FeatureCollection of all electoral constituencies in Kenya."
+          responsePayload={`{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[...]]]
+      },
+      "properties": {
+        "id": 1,
+        "slug": "KE047287",
+        "name": "Makadara"
+      }
+    }
+  ]
+}`}
+        />
+
+        <Endpoint 
+          method="GET"
+          path="/api/v1/counties/:slug/constituencies"
+          description="Get all constituencies within a specific county, returned as a FeatureCollection."
+          parameters={[
+            { name: "slug", type: "string", description: "The county code (e.g., KE047 for Nairobi)." }
+          ]}
+          responsePayload={`{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[...]]]
+      },
+      "properties": {
+        "id": 1,
+        "slug": "KE047287",
+        "name": "Makadara"
+      }
+    }
+  ]
+}`}
+        />
+      </section>
+
+      <section className="pt-8">
         <h2 className="text-2xl font-bold border-b pb-2 mb-8">Sub-Counties</h2>
         <Endpoint
           method="GET"

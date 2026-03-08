@@ -77,12 +77,13 @@ func main() {
 	// Create sqlc-generated Queries (used by SpatialService)
 	sqlcQueries := postgres.New(dbPool)
 
-	// 4. Dependency Injection Setup
 	pgRepo := postgres.NewCountyRepository(dbPool)
 	// create constituency repository and service so router can list constituencies
 	consRepo := postgres.NewConstituencyRepository(dbPool)
 	// create sub-county repository
 	subCountyRepo := postgres.NewSubCountyRepository(dbPool)
+	// create ward repository
+	wardRepo := postgres.NewWardRepository(dbPool)
 
 	// Initialize redis cache if configured; otherwise fall back to noopCache
 	var cacheRepo service.CacheRepository
@@ -124,13 +125,13 @@ func main() {
 		}
 	}
 
-	// spatial repository (used by handlers for intersection lookups)
 	spatialRepo := &repository.SpatialRepository{DB: dbPool}
 
 	countySvc := service.NewCountyService(pgRepo, cacheRepo, spatialRepo)
 	consSvc := service.NewConstituencyService(consRepo, cacheRepo)
 	spatialSvc := service.NewSpatialService(sqlcQueries, rdb)
 	subCountySvc := service.NewSubCountyService(subCountyRepo, cacheRepo)
+	wardSvc := service.NewWardService(wardRepo, cacheRepo)
 
 	// Use the handler.AppServices type so SetupRouter can register explicit handlers
 	svc := &handler.AppServices{
@@ -138,6 +139,7 @@ func main() {
 		Constituency: consSvc,
 		Spatial:      spatialSvc,
 		SubCounty:    subCountySvc,
+		Ward:         wardSvc,
 	}
 
 	// wire svc into handlers/router and apply rate limiter middleware to /api/v1

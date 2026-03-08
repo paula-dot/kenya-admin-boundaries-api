@@ -23,3 +23,12 @@ type SubCounty struct {
 	SubCountyCode string `json:"sub_county_code"`
 	SubCountyName string `json:"sub_county_name"`
 }
+
+type Ward struct {
+	CountyCode       int32  `json:"county_code"`
+	CountyName       string `json:"county_name"`
+	ConstituencyCode int32  `json:"constituency_code"`
+	ConstituencyName string `json:"constituency_name"`
+	WardCode         int32  `json:"ward_code"`
+	WardName         string `json:"ward_name"`
+}

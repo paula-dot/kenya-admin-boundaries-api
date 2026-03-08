@@ -14,14 +14,12 @@ import (
 	"github.com/paula-dot/kenya-admin-boundaries-api/pkg/geojson"
 )
 
-// AppServices is a small container for wiring explicit handlers in SetupRouter.
-// When passed into SetupRouter callers can avoid runtime assertions and the
-// router will register concrete handlers using these service instances.
 type AppServices struct {
 	County       *service.CountyService
 	Constituency *service.ConstituencyService
 	Spatial      *service.SpatialService
 	SubCounty    *service.SubCountyService
+	Ward         *service.WardService
 }
 
 // SetupRouter wires service into HTTP routes and returns a *gin.Engine.
@@ -250,6 +248,16 @@ func SetupRouter(svc interface{}, v1Middleware ...gin.HandlerFunc) *gin.Engine {
 			})
 			v1.GET("/counties/:slug/sub-counties", func(c *gin.Context) {
 				c.JSON(http.StatusNotImplemented, gin.H{"error": "ListByCounty SubCounties not implemented"})
+			})
+		}
+
+		// Wire up wards if available
+		if svcApp, ok := svc.(*AppServices); ok && svcApp.Ward != nil {
+			wardHdlr := NewWardHandler(svcApp.Ward)
+			v1.GET("/wards", wardHdlr.ListAll)
+		} else {
+			v1.GET("/wards", func(c *gin.Context) {
+				c.JSON(http.StatusNotImplemented, gin.H{"error": "ListAll Wards not implemented"})
 			})
 		}
 
