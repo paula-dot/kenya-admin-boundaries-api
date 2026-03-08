@@ -255,6 +255,41 @@ export default function ApiDocs() {
 }`}
         />
       </section>
+
+      <section className="pt-8">
+        <h2 className="text-2xl font-bold border-b pb-2 mb-8">Wards</h2>
+        <Endpoint
+          method="GET"
+          path="/api/v1/wards"
+          description="Returns a paginated JSON list of all political wards across Kenya, including their parent constituency and county metadata."
+          parameters={[
+            { name: "page", type: "number", description: "The page number (default 1)." },
+            { name: "limit", type: "number", description: "The number of results per page (default 50)." }
+          ]}
+          responsePayload={`{
+  "page": 1,
+  "limit": 2,
+  "data": [
+    {
+      "ward_code": 1,
+      "ward_name": "Port Reitz",
+      "constituency_code": 1,
+      "constituency_name": "Changamwe",
+      "county_code": 1,
+      "county_name": "Mombasa"
+    },
+    {
+      "ward_code": 2,
+      "ward_name": "Kipevu",
+      "constituency_code": 1,
+      "constituency_name": "Changamwe",
+      "county_code": 1,
+      "county_name": "Mombasa"
+    }
+  ]
+}`}
+        />
+      </section>
     </div>
   );
 }
