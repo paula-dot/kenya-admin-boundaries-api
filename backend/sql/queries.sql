@@ -120,3 +120,15 @@ WHERE
     county_code = $1
 ORDER BY
     sub_county_code ASC;
+
+-- name: ListWards :many
+SELECT 
+    ward_code, 
+    ward_name, 
+    constituency_code, 
+    constituency_name, 
+    county_code, 
+    county_name
+FROM public.wards
+ORDER BY ward_code ASC
+LIMIT $1 OFFSET $2;

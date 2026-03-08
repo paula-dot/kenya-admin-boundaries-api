@@ -419,3 +419,57 @@ func (q *Queries) ListCounties(ctx context.Context) ([]ListCountiesRow, error) {
 	}
 	return items, nil
 }
+
+const listWards = `-- name: ListWards :many
+SELECT 
+    ward_code, 
+    ward_name, 
+    constituency_code, 
+    constituency_name, 
+    county_code, 
+    county_name
+FROM public.wards
+ORDER BY ward_code ASC
+LIMIT $1 OFFSET $2
+`
+
+type ListWardsParams struct {
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
+}
+
+type ListWardsRow struct {
+	WardCode         int32  `json:"ward_code"`
+	WardName         string `json:"ward_name"`
+	ConstituencyCode int32  `json:"constituency_code"`
+	ConstituencyName string `json:"constituency_name"`
+	CountyCode       int32  `json:"county_code"`
+	CountyName       string `json:"county_name"`
+}
+
+func (q *Queries) ListWards(ctx context.Context, arg ListWardsParams) ([]ListWardsRow, error) {
+	rows, err := q.db.Query(ctx, listWards, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListWardsRow{}
+	for rows.Next() {
+		var i ListWardsRow
+		if err := rows.Scan(
+			&i.WardCode,
+			&i.WardName,
+			&i.ConstituencyCode,
+			&i.ConstituencyName,
+			&i.CountyCode,
+			&i.CountyName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
