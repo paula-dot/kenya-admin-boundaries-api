@@ -1,6 +1,6 @@
 # Kenya Admin Boundaries API
 
-A production-grade geospatial REST API mapping Kenya's administrative and electoral boundaries down to the constituency and sub-county level.
+A production-grade geospatial REST API mapping Kenya's administrative and electoral boundaries down to the constituency level.
 
 This project provides high-performance spatial queries, caching, and a clean JSON interface, built with a focus on Clean Architecture and scalable deployment.
 
